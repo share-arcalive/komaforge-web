@@ -3,6 +3,8 @@ import {
   copySelection,
   cutSelection,
   deleteSelection,
+  editorStore,
+  gotoPage,
   pasteClipboard,
   redo,
   toggleSelectedLock,
@@ -39,6 +41,8 @@ export default function EditorRoute() {
         paste: pasteClipboard,
         delete: deleteSelection,
         lock: toggleSelectedLock,
+        prevPage: () => gotoPage(editorStore.getState().pageIndex - 1),
+        nextPage: () => gotoPage(editorStore.getState().pageIndex + 1),
       }),
     [],
   );

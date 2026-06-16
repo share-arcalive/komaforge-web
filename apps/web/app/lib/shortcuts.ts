@@ -24,6 +24,8 @@ export const SHORTCUT_DEFS: ShortcutDef[] = [
   { id: "paste", label: "붙여넣기", gesture: "Ctrl+V" },
   { id: "delete", label: "삭제", gesture: "Delete" },
   { id: "lock", label: "잠금/해제", gesture: "L" },
+  { id: "prevPage", label: "이전 페이지", gesture: "PageUp" },
+  { id: "nextPage", label: "다음 페이지", gesture: "PageDown" },
 ];
 
 interface Combo {
