@@ -80,6 +80,13 @@ const GRADIENT_DIR_OPTIONS: { value: GradDir; label: string }[] = [
   { value: "Right", label: "오른쪽" },
 ];
 
+const FONT_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "기본(고딕)" },
+  { value: "serif", label: "명조" },
+  { value: "monospace", label: "고정폭" },
+  { value: "cursive", label: "손글씨" },
+];
+
 const checkpoint = () => editorStore.getState().checkpoint();
 
 /** 선택된 대상(칸/이미지/말풍선)에 집중한 속성 패널. 문서/페이지/구성은 페이지 패널 담당. */
@@ -204,6 +211,22 @@ export function Inspector() {
                   updateSelectedPanel({ ShowBorder: v });
                 }}
               />
+              {panel.ShowBackground && (
+                <Row label="배경색">
+                  <ColorInput
+                    value={panel.BackgroundColor}
+                    onChange={(v) => updateSelectedPanel({ BackgroundColor: v })}
+                  />
+                </Row>
+              )}
+              {panel.ShowBorder && (
+                <Row label="테두리색">
+                  <ColorInput
+                    value={panel.BorderColor}
+                    onChange={(v) => updateSelectedPanel({ BorderColor: v })}
+                  />
+                </Row>
+              )}
               <Check
                 label="잠금"
                 checked={panel.IsLocked}
@@ -371,6 +394,13 @@ export function Inspector() {
                   onChange={(v) => updateSelectedBubble({ FontSize: v })}
                 />
               </Row>
+              <Row label="글꼴">
+                <Select
+                  value={bubble.FontFamily}
+                  options={FONT_OPTIONS}
+                  onChange={(v) => updateSelectedBubble({ FontFamily: v })}
+                />
+              </Row>
               <Check
                 label="글자 외곽선"
                 checked={bubble.HasTextOutline}
@@ -388,6 +418,12 @@ export function Inspector() {
                 <ColorInput
                   value={bubble.StrokeColor}
                   onChange={(v) => updateSelectedBubble({ StrokeColor: v })}
+                />
+              </Row>
+              <Row label="말풍선 테두리">
+                <ColorInput
+                  value={bubble.BorderColor}
+                  onChange={(v) => updateSelectedBubble({ BorderColor: v })}
                 />
               </Row>
             </Section>

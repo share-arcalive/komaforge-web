@@ -14,13 +14,14 @@ import {
   setAutoGutter,
   setAutoMargin,
   setBlackBackground,
+  setPageBackgroundColor,
   setPageSize,
   setTitle,
   usePageIndex,
   useRev,
   useSelection,
 } from "@repo/editor";
-import { Btn, Check, Field, IconBtn, ListRow, NumberInput, Row, Section, TextInput } from "../components/ui";
+import { Btn, Check, ColorInput, Field, IconBtn, ListRow, NumberInput, Row, Section, TextInput } from "../components/ui";
 
 /** dockview 페이지/구조 패널 — 작품·페이지·칸 구성·칸 목록(내비게이션). */
 export function PagesPanel(_props: IDockviewPanelProps) {
@@ -94,6 +95,13 @@ function Pages() {
           <NumberInput value={page.PageHeight} onChange={(v) => setPageSize(page.PageWidth, v)} />
         </Row>
         <Check label="검정 배경" checked={page.BlackBackground} onChange={setBlackBackground} />
+        <Row label="배경색">
+          <ColorInput
+            value={page.BackgroundColor || (page.BlackBackground ? "#000000" : "#FFFFFF")}
+            onChange={setPageBackgroundColor}
+          />
+          {page.BackgroundColor ? <Btn onClick={() => setPageBackgroundColor("")}>기본</Btn> : null}
+        </Row>
       </Section>
 
       <Section title="칸 구성">

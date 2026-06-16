@@ -38,6 +38,7 @@ export const SpeechBubbleSchema = z.object({
   Width: z.number().default(170),
   Height: z.number().default(100),
   FontSize: z.number().default(18),
+  FontFamily: z.string().default(""),
   TextMarginLeft: z.number().default(16),
   TextMarginTop: z.number().default(12),
   TextMarginRight: z.number().default(16),
@@ -48,6 +49,7 @@ export const SpeechBubbleSchema = z.object({
   FillColor: z.string().default("#000000"),
   StrokeColor: z.string().default("#FFFFFF"),
   BackgroundColor: z.string().default("#FFFFFF"),
+  BorderColor: z.string().default("#000000"),
   Shape: BubbleShapeSchema.default("RoundRect"),
   ShapeCount: z.number().int().default(9),
   ShapeStrength: z.number().default(0),
@@ -98,6 +100,8 @@ export const ComicPanelSchema = z.object({
   // 데스크톱 .kfjson엔 없는 키 → 구파일은 기본값(true=기존 모습)으로 로드.
   ShowBackground: z.boolean().default(true),
   ShowBorder: z.boolean().default(true),
+  BackgroundColor: z.string().default("#FFFFFF"),
+  BorderColor: z.string().default("#000000"),
   Images: z.array(PanelImageSchema).default([]),
   Bubbles: z.array(SpeechBubbleSchema).default([]),
 });
@@ -108,6 +112,8 @@ export const ComicPageSchema = z.object({
   PageWidth: z.number().default(832),
   PageHeight: z.number().default(1216),
   BlackBackground: z.boolean().default(false),
+  // 빈 문자열이면 BlackBackground(검정/흰색)로, 값이 있으면 그 색을 페이지 배경으로(웹 확장·KomaForge 대응).
+  BackgroundColor: z.string().default(""),
   Panels: z.array(ComicPanelSchema).default([]),
 });
 export type ComicPageData = z.infer<typeof ComicPageSchema>;

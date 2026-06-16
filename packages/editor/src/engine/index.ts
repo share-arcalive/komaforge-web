@@ -620,7 +620,7 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
     // 페이지 배경
     const bg = new Graphics()
       .rect(0, 0, page.PageWidth, page.PageHeight)
-      .fill(page.BlackBackground ? 0x000000 : 0xffffff);
+      .fill(page.BackgroundColor ? col(page.BackgroundColor) : page.BlackBackground ? 0x000000 : 0xffffff);
     bg.eventMode = "static";
     bg.on("pointerdown", (e: FederatedPointerEvent) => pressAt(e));
     pageLayer.addChild(bg);
@@ -655,7 +655,7 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
     // 투명이면 "그림만"·칸 겹침(아래 칸 비침) 합성이 가능하다.
     const bg = new Graphics()
       .poly(flat)
-      .fill(panel.ShowBackground ? { color: 0xffffff } : { color: 0xffffff, alpha: 0.001 });
+      .fill(panel.ShowBackground ? { color: col(panel.BackgroundColor) } : { color: 0xffffff, alpha: 0.001 });
     bg.eventMode = "static";
     bg.cursor = "move";
     bg.on("pointerdown", (e: FederatedPointerEvent) => {
@@ -669,7 +669,7 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
 
     // 칸 테두리 — ShowBorder일 때만.
     if (panel.ShowBorder) {
-      c.addChild(new Graphics().poly(flat).stroke({ width: 2, color: 0x000000, alignment: 0.5 }));
+      c.addChild(new Graphics().poly(flat).stroke({ width: 2, color: col(panel.BorderColor), alignment: 0.5 }));
     }
     // 말풍선은 칸 프레임 위에서 별도 최상위 레이어로 그린다(경계 넘나듦) — renderScene 참고.
   }
@@ -864,7 +864,7 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
     const availW = Math.max(1, bubble.Width - bubble.TextMarginLeft - bubble.TextMarginRight);
     const availH = Math.max(1, bubble.Height - bubble.TextMarginTop - bubble.TextMarginBottom);
     const style = new TextStyle({
-      fontFamily: "system-ui, sans-serif",
+      fontFamily: bubble.FontFamily || "system-ui, sans-serif",
       fontSize: bubble.FontSize,
       fill: col(bubble.FillColor),
       align: "center",
@@ -1267,18 +1267,24 @@ function strokeMultiPoly(g: Graphics, mp: MultiPoly, width: number, color: numbe
 // 칸의 같은 크롭 그룹 말풍선들의 본체+꼬리를 Union 해 외곽선 하나로 그린다(원본 BubbleOutlinePath).
 function drawMergedBubbleOutlines(c: Container, panel: ComicPanelData): void {
   for (const cropped of [true, false]) {
-    const overlays: MultiPoly[] = [];
+    // 같은 크롭 + 같은 테두리색끼리만 Union(다른 색은 별도 stroke).
+    const byColor = new Map<string, MultiPoly[]>();
     for (const b of panel.Bubbles) {
       if (b.IsCropped !== cropped || isLineEffect(b.Shape)) continue;
       const body = bubbleBodyOutline(b);
       if (!body) continue;
-      overlays.push(combineBodyAndTails(body, bubbleTails(b), b.X, b.Y));
+      const key = b.BorderColor || "#000000";
+      const arr = byColor.get(key);
+      const overlay = combineBodyAndTails(body, bubbleTails(b), b.X, b.Y);
+      if (arr) arr.push(overlay);
+      else byColor.set(key, [overlay]);
     }
-    if (overlays.length === 0) continue;
-    const g = new Graphics();
-    strokeMultiPoly(g, unionAll(overlays), 2, 0x000000);
-    g.eventMode = "none";
-    c.addChild(g);
+    for (const [hex, overlays] of byColor) {
+      const g = new Graphics();
+      strokeMultiPoly(g, unionAll(overlays), 2, col(hex));
+      g.eventMode = "none";
+      c.addChild(g);
+    }
   }
 }
 

@@ -74,6 +74,15 @@ export function setBlackBackground(black: boolean): void {
   }, true);
 }
 
+/** 페이지 배경색(빈 문자열이면 검정/흰색 토글로 폴백). */
+export function setPageBackgroundColor(color: string): void {
+  const { pageIndex } = store.getState();
+  store.getState().apply((p) => {
+    const pg = currentPage(p, pageIndex);
+    if (pg) pg.BackgroundColor = color;
+  }, true);
+}
+
 export function renamePage(index: number, name: string): void {
   store.getState().apply((p) => {
     const pg = p.Pages[index];
@@ -134,7 +143,14 @@ export function updateSelectedPanel(
   patch: Partial<
     Pick<
       ComicPanelData,
-      "IsLocked" | "Name" | "CornerMode" | "CornerOffsets" | "ShowBackground" | "ShowBorder"
+      | "IsLocked"
+      | "Name"
+      | "CornerMode"
+      | "CornerOffsets"
+      | "ShowBackground"
+      | "ShowBorder"
+      | "BackgroundColor"
+      | "BorderColor"
     >
   >,
 ): void {
