@@ -1,4 +1,6 @@
-# my-webtoon-maker
+# KomaForge (Web)
+
+> 🟢 **라이브: https://share-arcalive.github.io/komaforge-web/** · 원본: **[KomaForge](https://github.com/unknowndevdot/KomaForge)** (흑우/unknowndevdot)
 
 KomaForge(C# WPF 망가 페이지 에디터)를 웹으로 포팅한 **Turborepo 모노레포**.
 원본 도메인 모델과 `.kfjson` 저장 포맷을 보존하며, 렌더링은 **Pixi.js(WebGL)**, 앱은 **React Router v7(SPA, 정적 빌드)** 로 구현했다.
