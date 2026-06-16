@@ -17,7 +17,7 @@ import { installShortcuts } from "../lib/shortcuts";
 import { resetLayout } from "../lib/workspace";
 
 export function meta() {
-  return [{ title: "my-webtoon-maker" }];
+  return [{ title: "KomaForge (Web)" }];
 }
 
 export default function EditorRoute() {

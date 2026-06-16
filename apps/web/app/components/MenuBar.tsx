@@ -38,7 +38,7 @@ export function MenuBar({
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-0.5 border-b border-line bg-surface px-2">
-      <span className="mr-2 px-1 text-sm font-semibold text-accent">my-webtoon-maker</span>
+      <span className="mr-2 px-1 text-sm font-semibold text-accent">KomaForge</span>
       <ToolButton icon={<FilePlus2 size={15} />} label="새 문서" onClick={() => newProject()} />
       <ToolButton icon={<FolderOpen size={15} />} label="불러오기" onClick={onOpen} />
       <Divider />
