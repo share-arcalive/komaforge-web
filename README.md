@@ -1,9 +1,24 @@
 # my-webtoon-maker
 
 KomaForge(C# WPF 망가 페이지 에디터)를 웹으로 포팅한 **Turborepo 모노레포**.
-원본 도메인 모델과 `.kfjson` 저장 포맷을 보존하며, 렌더링은 **Pixi.js(WebGL)**, 앱은 **React Router v7(SSR)** 로 구현했다.
+원본 도메인 모델과 `.kfjson` 저장 포맷을 보존하며, 렌더링은 **Pixi.js(WebGL)**, 앱은 **React Router v7(SPA, 정적 빌드)** 로 구현했다.
 
 > 변환 설계 문서: [PORTING_PROMPT.md](./PORTING_PROMPT.md) · 이어가기/남은 작업: [PROGRESS.md](./PROGRESS.md)
+
+## 원본 / 크레딧 / 라이선스
+
+이 프로젝트는 **흑우([unknowndevdot](https://github.com/unknowndevdot))** 님의
+**[KomaForge](https://github.com/unknowndevdot/KomaForge)** (C# WPF 망가 페이지 에디터)를 **웹으로 포팅**한 것입니다.
+원본의 도메인 모델과 `.kfjson` 저장 포맷을 그대로 보존했습니다.
+
+- 🔗 원본 저장소: **https://github.com/unknowndevdot/KomaForge**
+- 🙏 원작자 **흑우 (unknowndevdot)** 님께 깊이 감사드립니다.
+- ↩️ 이 웹 포팅본은 **아카라이브 커뮤니티에 그대로 환원**합니다.
+
+**라이선스:** 원본과 동일하게 **PolyForm Noncommercial License 1.0.0** ([LICENSE.md](./LICENSE.md))을 따릅니다.
+**비상업적 용도로만** 사용·배포·개작할 수 있습니다.
+
+> Required Notice: Copyright (c) 2026 unknowndevdot
 
 ## 빠른 시작
 
