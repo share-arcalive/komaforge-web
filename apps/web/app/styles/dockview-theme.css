@@ -1,0 +1,24 @@
+/* dockview themeDark(.dockview-theme-dark) 위에 my-webtoon-maker 토큰을 매핑한다.
+   값은 app.css @theme 다크 토큰(:root의 --color-*)을 그대로 참조해 한 곳에서 관리.
+   반드시 base CSS(dockview/dist/styles/dockview.css) 다음에 import 할 것. */
+.dockview-theme-dark {
+  --dv-group-view-background-color: var(--color-bg);
+  --dv-tabs-and-actions-container-background-color: var(--color-surface);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--color-bg);
+  --dv-activegroup-visiblepanel-tab-color: var(--color-ink);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--color-bg);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--color-ink-muted);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--color-surface);
+  --dv-activegroup-hiddenpanel-tab-color: var(--color-ink-muted);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--color-surface);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--color-ink-faint);
+  --dv-separator-border: var(--color-line);
+  --dv-tab-divider-color: var(--color-surface);
+  --dv-paneview-active-outline-color: var(--color-accent);
+  --dv-active-sash-color: var(--color-accent);
+  --dv-sash-color: transparent;
+  --dv-icon-hover-background-color: var(--color-raised);
+  --dv-drag-over-background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  --dv-tabs-and-actions-container-height: 34px;
+  --dv-tab-font-size: 12px;
+}

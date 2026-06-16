@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  /* 다크 시맨틱 토큰 */
+  --color-bg: #0e0e11; /* 앱 바닥 */
+  --color-surface: #17171b; /* 툴바·패널 헤더 */
+  --color-raised: #202026; /* hover·raised */
+  --color-line: #2a2a31; /* 보더 */
+  --color-ink: #e8e8ec; /* 본문 */
+  --color-ink-muted: #a2a2ab;
+  --color-ink-faint: #6c6c76;
+  --color-accent: #3a9690; /* 기존 teal #2b6f6a를 다크 대비로 상향 */
+  --color-accent-hover: #46b0a8;
+
+  /* 구버전 참조 호환(점진 이행용) — 다크 값으로 매핑 */
+  --color-paper: var(--color-bg);
+  --color-panel: var(--color-surface);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  color-scheme: dark; /* 네이티브 폼 컨트롤(색/숫자/슬라이더/셀렉트)도 다크로 */
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+#root,
+main {
+  height: 100%;
+}
