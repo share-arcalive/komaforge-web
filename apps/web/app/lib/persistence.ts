@@ -9,6 +9,7 @@ import {
 import type { EditorHandle } from "@repo/editor/engine";
 import { idbGet, idbSet } from "./idb";
 import { zipStore, type ZipEntry } from "./zip";
+import { encodeAnimatedWebP } from "./webpAnim";
 
 interface Bundle {
   kind: "my-webtoon-maker";
@@ -118,6 +119,32 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
+}
+
+/** 현재 페이지를 fps·durationSec로 실시간 샘플링해 움직이는 WebP로 내보낸다(원본 RenderCurrentPageAnimation).
+ *  애니/동영상이 있으면 그 움직임이 담긴다. 반환=캡처된 프레임 수(0이면 실패). */
+export async function exportAnimatedWebP(
+  handle: EditorHandle,
+  scale = 1,
+  fps = 12,
+  durationSec = 2,
+  onProgress?: (done: number, total: number) => void,
+): Promise<number> {
+  const res = await handle.captureAnimation({ scale, quality: 0.9, fps, durationSec }, onProgress);
+  if (!res || res.frames.length === 0) return 0;
+  const delays = res.frames.map(() => res.delayMs);
+  const webp = encodeAnimatedWebP(res.frames, delays, res.width, res.height, 0);
+  const project = editorStore.getState().project;
+  const page = project.Pages[editorStore.getState().pageIndex];
+  const base = (project.Title || "page").replace(/[^\w\-가-힣 ]+/g, "_").trim() || "page";
+  const blob = new Blob([webp.slice().buffer], { type: "image/webp" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${base}-${page?.Name ?? "page"}.webp`;
+  a.click();
+  URL.revokeObjectURL(url);
+  return res.frames.length;
 }
 
 /** 모든 페이지를 `001_이름.png` … 으로 렌더해 하나의 zip으로 내보낸다(원본 ExportPagesAsImages). */

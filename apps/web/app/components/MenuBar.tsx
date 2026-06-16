@@ -4,6 +4,7 @@ import {
   FileJson,
   FilePlus2,
   Files,
+  Film,
   FolderOpen,
   ImageDown,
   Keyboard,
@@ -14,7 +15,13 @@ import {
   Undo2,
 } from "lucide-react";
 import { newProject, redo, undo, useHistoryFlags } from "@repo/editor";
-import { exportAllPagesZip, exportPng, saveBundleToFile, saveKfjsonToFile } from "../lib/persistence";
+import {
+  exportAllPagesZip,
+  exportAnimatedWebP,
+  exportPng,
+  saveBundleToFile,
+  saveKfjsonToFile,
+} from "../lib/persistence";
 import { useEditorHandle } from "../lib/editorHandle";
 import { showPanel } from "../lib/workspace";
 
@@ -30,12 +37,23 @@ export function MenuBar({
   const { canUndo, canRedo } = useHistoryFlags();
   const handle = useEditorHandle();
   const [scale, setScale] = useState(1); // 내보내기 해상도 배수(1/2/3×)
+  const [capturing, setCapturing] = useState(false); // 움직이는 WebP 캡처 중
 
   const onExport = async () => {
     if (handle) await exportPng(handle, scale);
   };
   const onExportZip = async () => {
     if (handle) await exportAllPagesZip(handle, scale);
+  };
+  const onExportWebp = async () => {
+    if (!handle || capturing) return;
+    setCapturing(true);
+    try {
+      const n = await exportAnimatedWebP(handle, scale);
+      if (n === 0) alert("내보낼 내용이 없습니다.");
+    } finally {
+      setCapturing(false);
+    }
   };
 
   return (
@@ -70,6 +88,13 @@ export function MenuBar({
         <option value={2}>2×</option>
         <option value={3}>3×</option>
       </select>
+      <ToolButton
+        icon={<Film size={15} />}
+        label={capturing ? "캡처중…" : "WebP"}
+        title="움직이는 WebP 내보내기(현재 페이지 애니/동영상)"
+        onClick={onExportWebp}
+        disabled={!handle || capturing}
+      />
       <Divider />
       <ToolButton icon={<Undo2 size={15} />} label="실행취소" onClick={() => undo()} disabled={!canUndo} />
       <ToolButton icon={<Redo2 size={15} />} label="다시실행" onClick={() => redo()} disabled={!canRedo} />

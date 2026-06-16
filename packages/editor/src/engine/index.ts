@@ -60,6 +60,11 @@ export interface EditorHandle {
   exportCurrentPagePng: (scale?: number) => Promise<string | null>;
   /** 임의 페이지를 페이지 크기 PNG(dataURL)로 추출(다중 페이지 zip 내보내기용). scale=출력 배수. */
   exportPagePng: (index: number, scale?: number) => Promise<string | null>;
+  /** 현재 페이지를 fps로 durationSec 동안 실시간 샘플링해 애니 WebP용 프레임(정지 webp 바이트)을 캡처. */
+  captureAnimation: (
+    opts: { scale: number; quality: number; fps: number; durationSec: number },
+    onProgress?: (done: number, total: number) => void,
+  ) => Promise<{ frames: Uint8Array[]; delayMs: number; width: number; height: number } | null>;
 }
 
 export async function createEditor(container: HTMLElement): Promise<EditorHandle> {
@@ -1088,6 +1093,64 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
     }
   }
 
+  function canvasToWebpBlob(cv: unknown, quality: number): Promise<Blob | null> {
+    const c = cv as {
+      convertToBlob?: (o: { type: string; quality: number }) => Promise<Blob>;
+      toBlob?: (cb: (b: Blob | null) => void, type: string, quality: number) => void;
+    };
+    if (typeof c.convertToBlob === "function") return c.convertToBlob({ type: "image/webp", quality });
+    return new Promise((res) => {
+      if (typeof c.toBlob === "function") c.toBlob((b) => res(b), "image/webp", quality);
+      else res(null);
+    });
+  }
+
+  // 현재 페이지를 fps로 durationSec 동안 실시간 샘플링(라이브 애니/동영상 진행분을 캡처) → 정지 webp 프레임들.
+  async function captureAnimation(
+    opts: { scale: number; quality: number; fps: number; durationSec: number },
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<{ frames: Uint8Array[]; delayMs: number; width: number; height: number } | null> {
+    const { project, pageIndex } = editorStore.getState();
+    const page = currentPage(project, pageIndex);
+    if (!page) return null;
+    const fps = Math.min(50, Math.max(1, opts.fps));
+    const n = Math.min(300, Math.max(1, Math.round(fps * opts.durationSec)));
+    const delayMs = Math.round(1000 / fps);
+    const scale = Math.max(0.1, opts.scale);
+    const prevScale = viewport.scale.x;
+    const prevPos = viewport.position.clone();
+    const overlayVisible = overlay.visible;
+    viewport.scale.set(1);
+    viewport.position.set(0, 0);
+    overlay.visible = false;
+    const frames: Uint8Array[] = [];
+    try {
+      for (let i = 0; i < n; i++) {
+        for (const v of video.values()) if (v.live && v.el.readyState >= 2) v.texture.source.update();
+        const cv = app.renderer.extract.canvas({
+          target: pageLayer,
+          frame: new Rectangle(0, 0, page.PageWidth, page.PageHeight),
+          resolution: scale,
+        });
+        const blob = await canvasToWebpBlob(cv, opts.quality);
+        if (blob) frames.push(new Uint8Array(await blob.arrayBuffer()));
+        onProgress?.(i + 1, n);
+        if (i < n - 1) await new Promise((r) => setTimeout(r, delayMs));
+      }
+      return {
+        frames,
+        delayMs,
+        width: Math.round(page.PageWidth * scale),
+        height: Math.round(page.PageHeight * scale),
+      };
+    } finally {
+      viewport.scale.set(prevScale);
+      viewport.position.copyFrom(prevPos);
+      overlay.visible = overlayVisible;
+      scheduleRender();
+    }
+  }
+
   return {
     destroy: () => {
       unsub();
@@ -1122,6 +1185,7 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
     },
     exportCurrentPagePng,
     exportPagePng,
+    captureAnimation,
   };
 }
 
