@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   FileArchive,
   FileJson,
@@ -28,12 +29,13 @@ export function MenuBar({
 }) {
   const { canUndo, canRedo } = useHistoryFlags();
   const handle = useEditorHandle();
+  const [scale, setScale] = useState(1); // 내보내기 해상도 배수(1/2/3×)
 
   const onExport = async () => {
-    if (handle) await exportPng(handle);
+    if (handle) await exportPng(handle, scale);
   };
   const onExportZip = async () => {
-    if (handle) await exportAllPagesZip(handle);
+    if (handle) await exportAllPagesZip(handle, scale);
   };
 
   return (
@@ -58,6 +60,16 @@ export function MenuBar({
         onClick={onExportZip}
         disabled={!handle}
       />
+      <select
+        value={scale}
+        onChange={(e) => setScale(Number(e.target.value))}
+        title="내보내기 배수(해상도)"
+        className="rounded-lg border border-line bg-raised px-1.5 py-1 text-xs text-ink"
+      >
+        <option value={1}>1×</option>
+        <option value={2}>2×</option>
+        <option value={3}>3×</option>
+      </select>
       <Divider />
       <ToolButton icon={<Undo2 size={15} />} label="실행취소" onClick={() => undo()} disabled={!canUndo} />
       <ToolButton icon={<Redo2 size={15} />} label="다시실행" onClick={() => redo()} disabled={!canRedo} />

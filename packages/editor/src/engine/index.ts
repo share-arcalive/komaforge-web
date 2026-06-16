@@ -56,9 +56,10 @@ export interface EditorHandle {
   /** 컨테이너(부모 패널) 현재 크기에 맞춰 렌더러를 리사이즈+재렌더. dockview 패널 리사이즈용
    *  (`resizeTo`는 창 리사이즈만 추종하므로 패널 크기 변경 시 직접 호출). 0 크기(숨김 탭)는 무시. */
   resize: () => void;
-  exportCurrentPagePng: () => Promise<string | null>;
-  /** 임의 페이지를 페이지 크기 PNG(dataURL)로 추출(다중 페이지 zip 내보내기용). */
-  exportPagePng: (index: number) => Promise<string | null>;
+  /** 현재 페이지를 PNG(dataURL)로. scale=출력 배수(1/2/3…), 해상도만 키우고 좌표는 동일. */
+  exportCurrentPagePng: (scale?: number) => Promise<string | null>;
+  /** 임의 페이지를 페이지 크기 PNG(dataURL)로 추출(다중 페이지 zip 내보내기용). scale=출력 배수. */
+  exportPagePng: (index: number, scale?: number) => Promise<string | null>;
 }
 
 export async function createEditor(container: HTMLElement): Promise<EditorHandle> {
@@ -721,12 +722,102 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
       e.stopPropagation();
       pressAt(e); // 사각 스프라이트가 아니라 픽셀 알파/도형으로 실제 대상을 고른다.
     });
-    parent.addChild(spr);
-
+    // 이미지+그라데이션을 한 컨테이너로 묶는다: 크롭은 컨테이너에, 가장자리 그라데이션은
+    // 스프라이트에(마스크 1개 제한 회피 — 둘이 겹쳐도 동작).
+    const imgC = new Container();
+    imgC.addChild(spr);
+    parent.addChild(imgC);
     if (image.IsCropped) {
       const mask = new Graphics().poly(maskFlat).fill(0xffffff);
-      parent.addChild(mask);
-      spr.mask = mask;
+      imgC.addChild(mask);
+      imgC.mask = mask;
+    }
+    applyImageGradient(imgC, spr, image);
+  }
+
+  /** hex(#rgb/#rrggbb) → {r,g,b}. */
+  function hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const h = hex.replace("#", "").trim();
+    const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+    const n = Number.parseInt(full || "ffffff", 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  // 가장자리 그라데이션 텍스처 캐시(1×256/256×1). dir+stops만으로 결정(크기 무관 — 스프라이트가 늘림).
+  const gradientTextures = new Map<string, Texture>();
+  function gradientTexture(
+    dir: "Top" | "Bottom" | "Left" | "Right",
+    stops: { o: number; c: string }[],
+  ): Texture {
+    const key = `${dir}|${stops.map((s) => s.o.toFixed(3) + s.c).join(",")}`;
+    const cached = gradientTextures.get(key);
+    if (cached) return cached;
+    const horiz = dir === "Left" || dir === "Right";
+    const cw = horiz ? 256 : 1;
+    const ch = horiz ? 1 : 256;
+    const cv = document.createElement("canvas");
+    cv.width = cw;
+    cv.height = ch;
+    const ctx = cv.getContext("2d")!;
+    // 그라데이션 start = 대상(방향) 변.
+    const line =
+      dir === "Top" ? [0, 0, 0, ch]
+      : dir === "Bottom" ? [0, ch, 0, 0]
+      : dir === "Left" ? [0, 0, cw, 0]
+      : [cw, 0, 0, 0]; // Right
+    const g = ctx.createLinearGradient(line[0]!, line[1]!, line[2]!, line[3]!);
+    for (const s of stops) g.addColorStop(Math.min(1, Math.max(0, s.o)), s.c);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cw, ch);
+    const tex = Texture.from(cv);
+    gradientTextures.set(key, tex);
+    return tex;
+  }
+
+  /** 원본 ApplyImageGradient: 색 투명(Opacity 0)이면 가장자리 페이드아웃(스프라이트 알파마스크),
+   *  색 있으면 그 색 그라데이션 오버레이. Start%까지 완전·End% 이후 원본. */
+  function applyImageGradient(imgC: Container, spr: Sprite, image: PanelImageData): void {
+    const dir = image.GradientDirection;
+    if (dir === "None") return;
+    const x = image.TranslateX;
+    const y = image.TranslateY;
+    const w = spr.width;
+    const h = spr.height;
+    if (w <= 0 || h <= 0) return;
+    const s = Math.min(Math.max(Math.min(image.GradientStart, image.GradientEnd), 0), 100) / 100;
+    const e = Math.min(Math.max(Math.max(image.GradientStart, image.GradientEnd), 0), 100) / 100;
+    if (image.GradientOpacity <= 0) {
+      const tex = gradientTexture(dir, [
+        { o: 0, c: "rgba(255,255,255,0)" },
+        { o: s, c: "rgba(255,255,255,0)" },
+        { o: e, c: "rgba(255,255,255,1)" },
+        { o: 1, c: "rgba(255,255,255,1)" },
+      ]);
+      const m = new Sprite(tex);
+      m.x = x;
+      m.y = y;
+      m.width = w;
+      m.height = h;
+      imgC.addChild(m);
+      spr.mask = m;
+    } else {
+      const { r, g, b } = hexToRgb(image.GradientColor);
+      const a = Math.min(1, Math.max(0, image.GradientOpacity));
+      const col = `rgba(${r},${g},${b},${a})`;
+      const clr = `rgba(${r},${g},${b},0)`;
+      const tex = gradientTexture(dir, [
+        { o: 0, c: col },
+        { o: s, c: col },
+        { o: e, c: clr },
+        { o: 1, c: clr },
+      ]);
+      const ov = new Sprite(tex);
+      ov.x = x;
+      ov.y = y;
+      ov.width = w;
+      ov.height = h;
+      ov.eventMode = "none";
+      imgC.addChild(ov);
     }
   }
 
@@ -949,7 +1040,7 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
 
   /* ---------- PNG 내보내기 ---------- */
   // 현재 pageLayer(스토어의 현재 페이지가 렌더된 상태)를 페이지 크기로 추출한다.
-  async function extractPage(page: ComicPageData): Promise<string | null> {
+  async function extractPage(page: ComicPageData, scale = 1): Promise<string | null> {
     const prevScale = viewport.scale.x;
     const prevPos = viewport.position.clone();
     const overlayVisible = overlay.visible;
@@ -959,10 +1050,11 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
     // 동영상은 현재 프레임을 스틸로 캡처(원본 seek 썸네일 대체) — 추출 직전 최신 프레임을 GPU로 올린다.
     for (const v of video.values()) if (v.live && v.el.readyState >= 2) v.texture.source.update();
     try {
+      // resolution=scale → 출력 픽셀 크기 = 페이지크기 × scale (좌표/레이아웃은 그대로, 해상도만 배수).
       return await app.renderer.extract.base64({
         target: pageLayer,
         frame: new Rectangle(0, 0, page.PageWidth, page.PageHeight),
-        resolution: 1,
+        resolution: Math.max(0.1, scale),
       });
     } finally {
       viewport.scale.set(prevScale);
@@ -972,24 +1064,24 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
     }
   }
 
-  async function exportCurrentPagePng(): Promise<string | null> {
+  async function exportCurrentPagePng(scale = 1): Promise<string | null> {
     const { project, pageIndex } = editorStore.getState();
     const page = currentPage(project, pageIndex);
-    return page ? extractPage(page) : null;
+    return page ? extractPage(page, scale) : null;
   }
 
   // 원본 ExportPagesAsImages: 대상 페이지로 잠시 전환→동기 렌더→추출→복원(선택 유지).
-  async function exportPagePng(index: number): Promise<string | null> {
+  async function exportPagePng(index: number, scale = 1): Promise<string | null> {
     const st = editorStore.getState();
     const page = st.project.Pages[index];
     if (!page) return null;
-    if (index === st.pageIndex) return extractPage(page);
+    if (index === st.pageIndex) return extractPage(page, scale);
     const prevIndex = st.pageIndex;
     const prevSel = st.selection;
     editorStore.setState({ pageIndex: index, selection: { kind: "none" } });
     renderScene();
     try {
-      return await extractPage(page);
+      return await extractPage(page, scale);
     } finally {
       editorStore.setState({ pageIndex: prevIndex, selection: prevSel });
       renderScene();
@@ -1014,6 +1106,8 @@ export async function createEditor(container: HTMLElement): Promise<EditorHandle
       container.removeEventListener("dragover", onDragOver);
       container.removeEventListener("drop", onDrop);
       app.canvas.removeEventListener("wheel", onWheel);
+      for (const t of gradientTextures.values()) t.destroy(true);
+      gradientTextures.clear();
       app.destroy(true, { children: true });
     },
     resize: () => {

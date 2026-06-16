@@ -71,6 +71,15 @@ function shapeLabels(shape: BubbleShape): { count: string; strength: string } {
   }
 }
 
+type GradDir = "None" | "Top" | "Bottom" | "Left" | "Right";
+const GRADIENT_DIR_OPTIONS: { value: GradDir; label: string }[] = [
+  { value: "None", label: "없음" },
+  { value: "Top", label: "위" },
+  { value: "Bottom", label: "아래" },
+  { value: "Left", label: "왼쪽" },
+  { value: "Right", label: "오른쪽" },
+];
+
 const checkpoint = () => editorStore.getState().checkpoint();
 
 /** 선택된 대상(칸/이미지/말풍선)에 집중한 속성 패널. 문서/페이지/구성은 페이지 패널 담당. */
@@ -253,18 +262,68 @@ export function Inspector() {
             )}
           </div>
           {image && (
-            <div className="mt-1 flex flex-wrap items-center gap-3 border-t border-line pt-2">
-              <Check
-                label="칸에 맞춰 자르기(크롭)"
-                checked={image.IsCropped}
-                onChange={(v) => updateSelectedImage({ IsCropped: v })}
-              />
-              <Check
-                label="잠금"
-                checked={image.IsLocked}
-                onChange={(v) => updateSelectedImage({ IsLocked: v })}
-              />
-            </div>
+            <>
+              <div className="mt-1 flex flex-wrap items-center gap-3 border-t border-line pt-2">
+                <Check
+                  label="칸에 맞춰 자르기(크롭)"
+                  checked={image.IsCropped}
+                  onChange={(v) => updateSelectedImage({ IsCropped: v })}
+                />
+                <Check
+                  label="잠금"
+                  checked={image.IsLocked}
+                  onChange={(v) => updateSelectedImage({ IsLocked: v })}
+                />
+              </div>
+              <div className="mt-1 flex flex-col gap-2 border-t border-line pt-2">
+                <Row label="가장자리 그라데이션">
+                  <Select
+                    value={image.GradientDirection}
+                    options={GRADIENT_DIR_OPTIONS}
+                    onChange={(v) => {
+                      checkpoint();
+                      updateSelectedImage({ GradientDirection: v });
+                    }}
+                  />
+                </Row>
+                {image.GradientDirection !== "None" && (
+                  <>
+                    <Check
+                      label="색으로 채우기 (끄면 투명 페이드)"
+                      checked={image.GradientOpacity > 0}
+                      onChange={(v) => {
+                        checkpoint();
+                        updateSelectedImage({ GradientOpacity: v ? 1 : 0 });
+                      }}
+                    />
+                    {image.GradientOpacity > 0 && (
+                      <Row label="색 / 진하기">
+                        <ColorInput
+                          value={image.GradientColor}
+                          onChange={(v) => updateSelectedImage({ GradientColor: v })}
+                        />
+                        <Slider
+                          min={5}
+                          max={100}
+                          value={Math.round(image.GradientOpacity * 100)}
+                          onChange={(v) => updateSelectedImage({ GradientOpacity: v / 100 })}
+                        />
+                      </Row>
+                    )}
+                    <Row label="시작 % / 끝 %">
+                      <NumberInput
+                        value={image.GradientStart}
+                        onChange={(v) => updateSelectedImage({ GradientStart: v })}
+                      />
+                      <NumberInput
+                        value={image.GradientEnd}
+                        onChange={(v) => updateSelectedImage({ GradientEnd: v })}
+                      />
+                    </Row>
+                  </>
+                )}
+              </div>
+            </>
           )}
         </Section>
 

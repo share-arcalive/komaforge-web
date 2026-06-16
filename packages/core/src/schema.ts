@@ -72,6 +72,13 @@ export const PanelImageSchema = z.object({
   IsLocked: z.boolean().default(false),
   PivotX: z.number().default(0),
   PivotY: z.number().default(1),
+  // 가장자리 그라데이션(웹 확장). 선택한 변이 GradientColor로 페이드. 색 알파/Opacity 0이면
+  // 가장자리가 투명해지는 페이드아웃(마스크), >0이면 그 색 오버레이. Start%까지 완전·End% 이후 원본.
+  GradientDirection: z.enum(["None", "Top", "Bottom", "Left", "Right"]).catch("None").default("None"),
+  GradientColor: z.string().default("#FFFFFF"),
+  GradientOpacity: z.number().default(0),
+  GradientStart: z.number().default(40),
+  GradientEnd: z.number().default(60),
 });
 export type PanelImageData = z.infer<typeof PanelImageSchema>;
 

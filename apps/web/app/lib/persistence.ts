@@ -94,8 +94,8 @@ export async function restoreAutosave(): Promise<boolean> {
 
 /* ---------- PNG 내보내기 ---------- */
 
-export async function exportPng(handle: EditorHandle): Promise<void> {
-  const dataUrl = await handle.exportCurrentPagePng();
+export async function exportPng(handle: EditorHandle, scale = 1): Promise<void> {
+  const dataUrl = await handle.exportCurrentPagePng(scale);
   if (!dataUrl) return;
   const project = editorStore.getState().project;
   const page = project.Pages[editorStore.getState().pageIndex];
@@ -121,13 +121,13 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
 }
 
 /** 모든 페이지를 `001_이름.png` … 으로 렌더해 하나의 zip으로 내보낸다(원본 ExportPagesAsImages). */
-export async function exportAllPagesZip(handle: EditorHandle): Promise<number> {
+export async function exportAllPagesZip(handle: EditorHandle, scale = 1): Promise<number> {
   const { project } = editorStore.getState();
   const pages = project.Pages;
   if (pages.length === 0) return 0;
   const entries: ZipEntry[] = [];
   for (let i = 0; i < pages.length; i++) {
-    const dataUrl = await handle.exportPagePng(i);
+    const dataUrl = await handle.exportPagePng(i, scale);
     if (!dataUrl) continue;
     const name = `${String(i + 1).padStart(3, "0")}_${sanitizeName(pages[i]!.Name)}.png`;
     entries.push({ name, data: dataUrlToBytes(dataUrl) });
