@@ -1,0 +1,58 @@
+name: Deploy to GitHub Pages
+
+# main에 push될 때(또는 수동 실행 시) SPA를 /komaforge-web/ base로 빌드해
+# gh-pages 브랜치에 게시한다. Pages 소스가 "Deploy from a branch: gh-pages"이므로
+# 푸시 즉시 사이트가 갱신된다. (수동 배포로 인한 stale/오(誤)-base 빌드 재발 방지)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # gh-pages 브랜치에 푸시
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # package.json의 packageManager(pnpm@10.x) 사용
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SPA (base=/komaforge-web/)
+        run: pnpm --filter web build
+        env:
+          # vite base(에셋 URL) + RR basename(라우터) 둘 다 이 값으로 맞춰진다.
+          # GitHub Pages 프로젝트 사이트 경로(/<repo>/)와 반드시 일치해야 한다.
+          DEPLOY_BASE: /komaforge-web/
+
+      - name: Prepare Pages output
+        run: |
+          cd apps/web/build/client
+          cp index.html 404.html   # SPA 딥링크 폴백(Pages는 _redirects 무시)
+          touch .nojekyll           # _-접두 파일을 그대로 서빙
+
+      - name: Publish to gh-pages
+        run: |
+          cd apps/web/build/client
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "deploy ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages:gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
