@@ -5,8 +5,9 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   // 배포 base 경로(빌드 때만). GitHub Pages 프로젝트 사이트는 /<repo>/ 하위에 서빙되므로
-  // CI에서 DEPLOY_BASE="/my-webtoon-maker/"를 준다. dev/로컬은 "/"(기본). RR 플러그인이
-  // 이 base를 라우터 basename으로도 사용한다.
+  // 배포 시 DEPLOY_BASE="/komaforge-web/"를 준다(끝에 슬래시 필수). dev/로컬은 "/"(기본).
+  // 주의: 이 base는 "에셋 URL"만 정한다. 라우터 basename은 자동 연동되지 않으므로
+  // react-router.config.ts에서 같은 DEPLOY_BASE로 따로 맞춘다.
   base: process.env.DEPLOY_BASE || "/",
   server: {
     // 프리뷰/런타임이 지정한 PORT를 따른다(없으면 5173).
