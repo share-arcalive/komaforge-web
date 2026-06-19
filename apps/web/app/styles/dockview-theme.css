@@ -1,24 +1,25 @@
-/* dockview themeDark(.dockview-theme-dark) 위에 my-webtoon-maker 토큰을 매핑한다.
-   값은 app.css @theme 다크 토큰(:root의 --color-*)을 그대로 참조해 한 곳에서 관리.
+/* dockview themeDark(.dockview-theme-dark) 위에 KomaForge 토큰을 매핑한다.
+   값은 @repo/ui 의 raw 토큰(:root/.light 의 --background 등)을 직접 참조 — 테마 전환을 따라가고,
+   Tailwind @theme 의 --color-* 트리셰이크와 무관해 항상 정의돼 있다.
    반드시 base CSS(dockview/dist/styles/dockview.css) 다음에 import 할 것. */
 .dockview-theme-dark {
-  --dv-group-view-background-color: var(--color-bg);
-  --dv-tabs-and-actions-container-background-color: var(--color-surface);
-  --dv-activegroup-visiblepanel-tab-background-color: var(--color-bg);
-  --dv-activegroup-visiblepanel-tab-color: var(--color-ink);
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--color-bg);
-  --dv-inactivegroup-visiblepanel-tab-color: var(--color-ink-muted);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--color-surface);
-  --dv-activegroup-hiddenpanel-tab-color: var(--color-ink-muted);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--color-surface);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--color-ink-faint);
-  --dv-separator-border: var(--color-line);
-  --dv-tab-divider-color: var(--color-surface);
-  --dv-paneview-active-outline-color: var(--color-accent);
-  --dv-active-sash-color: var(--color-accent);
+  --dv-group-view-background-color: var(--background);
+  --dv-tabs-and-actions-container-background-color: var(--card);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--background);
+  --dv-activegroup-visiblepanel-tab-color: var(--foreground);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--background);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--muted-foreground);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--card);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--card);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--faint);
+  --dv-separator-border: var(--border);
+  --dv-tab-divider-color: var(--card);
+  --dv-paneview-active-outline-color: var(--primary);
+  --dv-active-sash-color: var(--primary);
   --dv-sash-color: transparent;
-  --dv-icon-hover-background-color: var(--color-raised);
-  --dv-drag-over-background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  --dv-icon-hover-background-color: var(--secondary);
+  --dv-drag-over-background-color: color-mix(in srgb, var(--primary) 18%, transparent);
   --dv-tabs-and-actions-container-height: 34px;
   --dv-tab-font-size: 12px;
 }

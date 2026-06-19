@@ -7,3 +7,10 @@ build
 *.log
 .env
 .vite
+
+# design-sync (변환 스크립트/번들/캐시 — 산출물은 무시, .design-sync/{config.json,NOTES.md,conventions.md,previews,overrides}만 커밋)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

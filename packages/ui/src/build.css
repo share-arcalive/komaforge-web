@@ -1,0 +1,25 @@
+/* design-sync(및 외부 소비)용 자립 컴파일 entry.
+   앱(app.css)은 `@import "tailwindcss"`를 먼저 하므로 styles.css엔 그게 없다.
+   CLI로 단독 컴파일할 땐 tailwindcss를 직접 들여온 뒤 DS 토큰/소스(styles.css)를 합친다.
+   → 컴파일 결과(dist/styles.css)에 토큰 + 컴포넌트 유틸리티 전부 포함. cfg.cssEntry가 이 파일을 가리킨다. */
+@import "tailwindcss";
+@import "./styles.css";
+
+/* 합성용 유틸리티 safelist — DS 스타일시트(dist/styles.css) 한정.
+   claude.ai/design의 디자인은 이 정적 styles.css만 받으므로, 디자인 에이전트가
+   컴포넌트 사이 레이아웃 글루에 쓸 일반 유틸리티를 미리 생성해 둔다(앱에는 영향 없음). */
+@source inline("{flex,inline-flex,grid,hidden,block,inline-block,contents,relative,absolute,fixed,sticky}");
+@source inline("inset-0 flex-{col,row,wrap,1,none} shrink-0 grow grid-cols-{1,2,3,4,6,12}");
+@source inline("{items,justify,self,content}-{start,center,end,between,around,stretch,baseline}");
+@source inline("gap-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12}");
+@source inline("{p,px,py,pt,pb,pl,pr}-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16}");
+@source inline("{m,mx,my,mt,mb,ml,mr}-{0,0.5,1,2,3,4,6,8,auto}");
+@source inline("{w,h,min-w,min-h,max-w,size}-{0,full,auto,fit,px,4,6,8,10,12,16,20,24,32,40,48,64,80,96,screen,xs,sm,md,lg,xl,2xl}");
+@source inline("text-{left,center,right,xs,sm,base,lg,xl,2xl,3xl}");
+@source inline("font-{normal,medium,semibold,bold} leading-{none,tight,snug,normal,relaxed} tracking-{tight,normal,wide} uppercase truncate");
+@source inline("rounded-{none,sm,md,lg,xl,2xl,full} border border-{0,2,t,b,l,r} shadow-{sm,md,lg,xl,none}");
+@source inline("{overflow-hidden,overflow-auto,overflow-y-auto,overflow-x-auto,cursor-pointer,cursor-default,select-none,transition,transition-colors,whitespace-nowrap}");
+@source inline("opacity-{0,40,50,60,70,80,90,100} ring ring-{0,1,2}");
+@source inline("{bg,text,border,ring,fill,stroke}-{background,foreground,card,card-foreground,popover,popover-foreground,primary,primary-foreground,primary-hover,secondary,secondary-foreground,muted,muted-foreground,accent,accent-foreground,destructive,destructive-foreground,border,input,ring,faint}");
+@source inline("{bg,text,border}-primary/{10,15,20,40,60} {bg,text}-{muted-foreground,foreground}/{50,60,70}");
+@source inline("{hover,focus,focus-visible}:{bg,text,border,ring}-{primary,primary-hover,secondary,accent,accent-foreground,muted,foreground,muted-foreground,destructive,ring,border}");

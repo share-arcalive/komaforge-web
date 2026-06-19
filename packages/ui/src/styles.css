@@ -1,0 +1,129 @@
+/* @repo/ui — 디자인 시스템 단일 진실원 (토큰 + 테마).
+   app.css가 `@import "tailwindcss"` 다음에 이 파일을 import 한다.
+
+   - 다크("스튜디오")가 기본(:root). 라이트("종이")는 html.light 클래스.
+   - 비-inline `@theme`(inline 아님): 코드가 var(--color-*)를 직접 참조하고(dockview-theme.css 등)
+     네이티브 컨트롤(accent-color)도 var를 쓰므로, --color-* 를 실제 :root 변수로 emit해야 한다.
+     (shadcn 표준 @theme inline은 emit하지 않아 깨짐.)
+   - 색 토큰은 모두 raw 토큰(--background 등)을 참조 → 테마 전환 시 그대로 따라온다. */
+
+/* enter/exit 애니메이션 유틸(animate-in/fade/zoom 등) — shadcn 컴포넌트가 사용. */
+@import "tw-animate-css";
+
+@source "./**/*.{ts,tsx}";
+
+/* default(다크) = html:not(.light). shadcn 스니펫의 dark: 변형이 기본 상태에서 동작하도록. */
+@custom-variant dark (&:where(html:not(.light), html:not(.light) *));
+
+/* ============ raw 토큰 ============ */
+:root {
+  color-scheme: dark;
+  --radius: 0.625rem;
+
+  /* 다크 "스튜디오" (기본) */
+  --background: #1a1815;
+  --foreground: #ece8e1;
+  --card: #211f1b;
+  --card-foreground: #ece8e1;
+  --popover: #211f1b;
+  --popover-foreground: #ece8e1;
+  --primary: #cc785c; /* Claude 클레이 */
+  --primary-foreground: #fdf6f2;
+  --primary-hover: #d68b71;
+  --secondary: #2d2a25;
+  --secondary-foreground: #ece8e1;
+  --muted: #2d2a25;
+  --muted-foreground: #a8a199;
+  --accent: #322e28; /* subtle bg(hover/focus) — secondary보다 살짝 밝게 */
+  --accent-foreground: #ece8e1;
+  --destructive: #d96a5f;
+  --destructive-foreground: #fdf6f2;
+  --border: #3a352e;
+  --input: #3a352e;
+  --ring: #cc785c;
+  --faint: #6e685f;
+}
+
+.light {
+  color-scheme: light;
+
+  /* 라이트 "종이" */
+  --background: #faf8f3;
+  --foreground: #2a2521;
+  --card: #ffffff;
+  --card-foreground: #2a2521;
+  --popover: #ffffff;
+  --popover-foreground: #2a2521;
+  --primary: #bd5d3c; /* 라이트 대비 상향 클레이 */
+  --primary-foreground: #ffffff;
+  --primary-hover: #a94f31;
+  --secondary: #f1ede4;
+  --secondary-foreground: #2a2521;
+  --muted: #f1ede4;
+  --muted-foreground: #6b6358;
+  --accent: #ece7dc; /* subtle bg(hover/focus) */
+  --accent-foreground: #2a2521;
+  --destructive: #c0392b;
+  --destructive-foreground: #ffffff;
+  --border: #e7e1d6;
+  --input: #e7e1d6;
+  --ring: #bd5d3c;
+  --faint: #978d7f;
+}
+
+/* ============ 디자인 토큰(유틸리티 생성 + :root 변수 emit) ============ */
+@theme {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* shadcn 시맨틱 */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-faint: var(--faint);
+
+  /* accent = subtle bg (표준 shadcn 의미). Phase B에서 브랜드 사용처를 primary로 이관 완료.
+     ghost/outline hover, dropdown/menu item focus 등에 쓰인다. */
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary-hover: var(--primary-hover);
+
+  /* 레거시 브리지(현행 apps/web 컴포넌트 + dockview-theme.css 가 쓰는 이름) */
+  --color-bg: var(--background);
+  --color-surface: var(--card);
+  --color-raised: var(--secondary);
+  --color-line: var(--border);
+  --color-ink: var(--foreground);
+  --color-ink-muted: var(--muted-foreground);
+  --color-ink-faint: var(--faint);
+  --color-paper: var(--background);
+  --color-panel: var(--card);
+  --color-accent-hover: var(--primary-hover);
+}
+
+/* 앱/프리뷰 공통 베이스: 바닥 배경·잉크(다크 기본). 디자인 시스템 단일 소스 —
+   claude.ai/design 프리뷰가 밝은 배경에서 깨지지 않게 styles.css 자체가 바닥을 깐다.
+   (앱 app.css는 html,body에 직접 지정해 우선함.) */
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+}

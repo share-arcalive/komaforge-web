@@ -509,7 +509,7 @@ export function Inspector() {
                         onClick={() => setTailIdx(i)}
                         className={`size-6 rounded border text-xs ${
                           i === safeTailIdx
-                            ? "border-accent bg-accent/15 text-ink"
+                            ? "border-primary bg-primary/15 text-ink"
                             : "border-line text-ink-muted hover:bg-raised"
                         }`}
                       >

@@ -65,7 +65,7 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
                   onClick={() => setCapturingId(def.id)}
                   className={`min-w-[140px] rounded border px-2 py-1 text-center text-xs ${
                     capturing
-                      ? "border-accent bg-accent/10 text-accent"
+                      ? "border-primary bg-primary/10 text-primary"
                       : "border-line bg-raised text-ink hover:bg-line"
                   }`}
                 >
@@ -89,7 +89,7 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded bg-accent px-3 py-1 text-xs font-medium text-white hover:opacity-90"
+            className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
           >
             닫기
           </button>

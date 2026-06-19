@@ -1,14 +1,17 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { themeScript } from "@repo/ui";
 import "./app.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>KomaForge (Web)</title>
         <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
+        {/* 첫 페인트 전 저장 테마 적용(FOUC 방지). 기본 다크, 저장값 light면 html.light. */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <Meta />
         <Links />
       </head>

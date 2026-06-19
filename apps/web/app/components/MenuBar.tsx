@@ -15,6 +15,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { newProject, redo, undo, useHistoryFlags } from "@repo/editor";
+import { ThemeToggle } from "@repo/ui";
 import {
   exportAllPagesZip,
   exportAnimatedWebP,
@@ -58,7 +59,7 @@ export function MenuBar({
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-0.5 border-b border-line bg-surface px-2">
-      <span className="mr-2 px-1 text-sm font-semibold text-accent">KomaForge</span>
+      <span className="mr-2 px-1 text-sm font-semibold text-primary">KomaForge</span>
       <ToolButton icon={<FilePlus2 size={15} />} label="새 문서" onClick={() => newProject()} />
       <ToolButton icon={<FolderOpen size={15} />} label="불러오기" onClick={onOpen} />
       <Divider />
@@ -119,6 +120,7 @@ export function MenuBar({
         onClick={onResetLayout}
       />
       <ToolButton icon={<Keyboard size={15} />} label="단축키" onClick={onOpenShortcuts} />
+      <ThemeToggle />
     </header>
   );
 }
