@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@import "@repo/ui/styles.css";
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+#root,
+main {
+  height: 100%;
+}

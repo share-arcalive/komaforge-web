@@ -1,0 +1,2934 @@
+diff --git a/.gitignore b/.gitignore
+index 72c624a..94d2ba7 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,6 +2,9 @@
+ bin/
+ obj/
+ 
++# Published single-file build output
++dist/
++
+ # Visual Studio / Rider / VS Code
+ .vs/
+ .idea/
+diff --git a/KomaForge.csproj b/KomaForge.csproj
+index 717d509..14f621b 100644
+--- a/KomaForge.csproj
++++ b/KomaForge.csproj
+@@ -6,7 +6,7 @@
+     <ImplicitUsings>enable</ImplicitUsings>
+     <UseWPF>true</UseWPF>
+     <ApplicationIcon />
+-    <Version>0.1.1</Version>
++    <Version>0.1.2</Version>
+     <Product>KomaForge</Product>
+     <Description>망가 페이지 에디터</Description>
+     <Authors>unknowndevdot</Authors>
+diff --git a/MainWindow.xaml b/MainWindow.xaml
+index 35e16ba..bb4a41b 100644
+--- a/MainWindow.xaml
++++ b/MainWindow.xaml
+@@ -1,7 +1,7 @@
+ <Window x:Class="KomaForge.MainWindow"
+         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+-        Title="KomaForge v0.1.1 - Comic Layout"
++        Title="KomaForge v0.1.2 - Comic Layout"
+         Width="1280"
+         Height="820"
+         MinWidth="980"
+@@ -10,6 +10,7 @@
+     <DockPanel>
+         <Menu DockPanel.Dock="Top" Background="#F3F0EA">
+             <MenuItem Header="파일(_F)">
++                <MenuItem x:Name="NewMenuItem" Header="새로 만들기" InputGestureText="Ctrl+N" Click="NewProject_Click" />
+                 <MenuItem x:Name="OpenMenuItem" Header="불러오기..." InputGestureText="Ctrl+O" Click="LoadProject_Click" />
+                 <MenuItem x:Name="SaveMenuItem" Header="저장" InputGestureText="Ctrl+S" Click="SaveMenuItem_Click" />
+                 <MenuItem Header="다른 이름으로 저장..." Click="SaveProject_Click" />
+@@ -67,7 +68,71 @@
+                              VerticalScrollBarVisibility="Disabled"
+                              Padding="6,2"
+                              TextChanged="ComicTitleTextBox_TextChanged"
+-                             Margin="0,0,0,18" />
++                             Margin="0,0,0,12" />
++
++                    <!-- 텍스트 모드 토글은 인스펙터에 노출하지 않는다(메뉴 '새로 만들기(텍스트 템플릿)'·프로젝트 불러오기로 결정).
++                         컨트롤은 섹션 표시/숨김 로직을 위해 그대로 두되 화면에는 보이지 않게 Collapsed. -->
++                    <CheckBox x:Name="FlowTextModeCheckBox"
++                              Content="텍스트 모드 (여러 페이지에 본문 흐름)"
++                              Visibility="Collapsed"
++                              Margin="0,0,0,12"
++                              Checked="FlowTextModeCheckBox_Changed"
++                              Unchecked="FlowTextModeCheckBox_Changed" />
++
++                    <Border x:Name="FlowTextSectionBorder" Style="{StaticResource InspectorSection}" Visibility="Collapsed">
++                    <StackPanel>
++                    <TextBlock Text="텍스트 (여러 페이지에 흐름)" Style="{StaticResource SectionHeader}" />
++                    <TextBlock Text="구간을 선택한 뒤 글꼴·글자색·아웃라인색을 바꾸면 그 부분만 적용됩니다(선택이 없으면 전체)."
++                               TextWrapping="Wrap" FontSize="11" Foreground="#8A8479" Margin="0,0,0,6" />
++                    <TextBox x:Name="FlowTextBox"
++                             AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
++                             VerticalScrollBarVisibility="Auto" Height="120"
++                             Padding="6,4" Margin="0,0,0,8"
++                             IsInactiveSelectionHighlightEnabled="True"
++                             TextChanged="FlowTextBox_TextChanged" />
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="글꼴" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
++                        <ComboBox x:Name="FlowFontFamilyComboBox" Width="130" MaxDropDownHeight="320" SelectionChanged="FlowFontFamilyComboBox_SelectionChanged" />
++                    </StackPanel>
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="크기" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
++                        <TextBox x:Name="FlowFontSizeBox" Width="60" Text="20" Padding="6,2" VerticalContentAlignment="Center" TextChanged="FlowStyleBox_Changed" />
++                        <TextBlock Text="줄간격" VerticalAlignment="Center" Margin="12,0,6,0" Foreground="#55514A" />
++                        <TextBox x:Name="FlowLineHeightBox" Width="48" Text="30" Padding="6,2" VerticalContentAlignment="Center" TextChanged="FlowStyleBox_Changed" ToolTip="0이면 자동" />
++                    </StackPanel>
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="정렬" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
++                        <ComboBox x:Name="FlowAlignmentComboBox" Width="130" SelectionChanged="FlowAlignmentComboBox_SelectionChanged">
++                            <ComboBoxItem Content="왼쪽" Tag="Left" />
++                            <ComboBoxItem Content="가운데" Tag="Center" />
++                            <ComboBoxItem Content="오른쪽" Tag="Right" />
++                            <ComboBoxItem Content="양쪽" Tag="Justify" IsSelected="True" />
++                        </ComboBox>
++                    </StackPanel>
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="글자색" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
++                        <ComboBox x:Name="FlowColorComboBox" Width="130" SelectionChanged="FlowColorComboBox_SelectionChanged" />
++                    </StackPanel>
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="아웃라인색" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
++                        <ComboBox x:Name="FlowOutlineColorComboBox" Width="130" SelectionChanged="FlowOutlineColorComboBox_SelectionChanged" ToolTip="'없음'이면 외곽선 없음" />
++                    </StackPanel>
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="뒷배경색" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
++                        <ComboBox x:Name="FlowBackdropColorComboBox" Width="130" SelectionChanged="FlowBackdropColorComboBox_SelectionChanged" ToolTip="페이지 뒤에 깔리는 색. 페이지 배경을 투명으로 하면 이 색이 보입니다. '없음'이면 투명." />
++                    </StackPanel>
++                    <TextBlock Text="여백 (좌·상·우·하)" Foreground="#55514A" Margin="0,0,0,4" />
++                    <UniformGrid Rows="1" Columns="4">
++                        <TextBox x:Name="FlowMarginLeftBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,4,0" TextChanged="FlowStyleBox_Changed" />
++                        <TextBox x:Name="FlowMarginTopBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,4,0" TextChanged="FlowStyleBox_Changed" />
++                        <TextBox x:Name="FlowMarginRightBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,4,0" TextChanged="FlowStyleBox_Changed" />
++                        <TextBox x:Name="FlowMarginBottomBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0" TextChanged="FlowStyleBox_Changed" />
++                    </UniformGrid>
++                    <Button Content="텍스트 길이에 맞춰 페이지 생성 및 삭제" Margin="0,12,0,0" Padding="8,5"
++                            Click="FitPagesToFlowText_Click"
++                            ToolTip="본문이 모두 보이도록 페이지 수를 자동으로 맞춥니다(부족하면 추가, 남으면 삭제)." />
++                    </StackPanel>
++                    </Border>
+ 
+                     <Border x:Name="PageSectionBorder"
+                             Style="{StaticResource InspectorSection}"
+@@ -504,7 +569,68 @@
+                     </StackPanel>
+                     <Border Style="{StaticResource InspectorGroup}">
+                     <StackPanel>
+-                    <TextBlock Text="텍스트 · 색상" Style="{StaticResource GroupHeader}" />
++                    <TextBlock Text="텍스트" Style="{StaticResource GroupHeader}" />
++
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="글자 크기"
++                                   Width="64"
++                                   VerticalAlignment="Center"
++                                   Foreground="#55514A" />
++                        <TextBox x:Name="BubbleFontBox"
++                                 Width="130"
++                                 Text="18"
++                                 Padding="6,2"
++                                 VerticalContentAlignment="Center"
++                                 TextChanged="BubbleFontBox_TextChanged" />
++                        <TextBlock Text="px"
++                                   VerticalAlignment="Center"
++                                   Margin="6,0,0,0"
++                                   Foreground="#55514A" />
++                    </StackPanel>
++
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="줄간격"
++                                   Width="64"
++                                   VerticalAlignment="Center"
++                                   Foreground="#55514A" />
++                        <TextBox x:Name="BubbleLineHeightBox"
++                                 Width="130"
++                                 Text="0"
++                                 Padding="6,2"
++                                 VerticalContentAlignment="Center"
++                                 ToolTip="0이면 자동"
++                                 TextChanged="BubbleLineHeightBox_TextChanged" />
++                    </StackPanel>
++
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="가로 맞춤"
++                                   Width="64"
++                                   VerticalAlignment="Center"
++                                   Foreground="#55514A" />
++                        <ComboBox x:Name="BubbleAlignmentComboBox"
++                                  Width="130"
++                                  SelectionChanged="BubbleAlignmentComboBox_SelectionChanged">
++                            <ComboBoxItem Content="왼쪽" Tag="Left" />
++                            <ComboBoxItem Content="가운데" Tag="Center" IsSelected="True" />
++                            <ComboBoxItem Content="오른쪽" Tag="Right" />
++                            <ComboBoxItem Content="양쪽" Tag="Justify" />
++                        </ComboBox>
++                    </StackPanel>
++
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="세로 맞춤"
++                                   Width="64"
++                                   VerticalAlignment="Center"
++                                   Foreground="#55514A" />
++                        <ComboBox x:Name="BubbleVAlignComboBox"
++                                  Width="130"
++                                  SelectionChanged="BubbleVAlignComboBox_SelectionChanged">
++                            <ComboBoxItem Content="위" Tag="Top" />
++                            <ComboBoxItem Content="가운데" Tag="Center" IsSelected="True" />
++                            <ComboBoxItem Content="아래" Tag="Bottom" />
++                        </ComboBox>
++                    </StackPanel>
++
+                     <TextBlock Text="말풍선 텍스트"
+                                Foreground="#55514A"
+                                Margin="0,0,0,6" />
+@@ -513,6 +639,8 @@
+                              TextWrapping="Wrap"
+                              MinHeight="74"
+                              Padding="8"
++                             IsInactiveSelectionHighlightEnabled="True"
++                             ToolTip="구간을 선택한 뒤 글자색·아웃라인색·글꼴을 바꾸면 그 부분만 적용됩니다(선택이 없으면 전체)."
+                              TextChanged="SelectedBubbleTextBox_TextChanged"
+                              Margin="0,0,0,12" />
+ 
+@@ -527,23 +655,6 @@
+                                   SelectionChanged="BubbleFontFamilyComboBox_SelectionChanged" />
+                     </StackPanel>
+ 
+-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="글자 크기"
+-                                   Width="64"
+-                                   VerticalAlignment="Center"
+-                                   Foreground="#55514A" />
+-                        <TextBox x:Name="BubbleFontBox"
+-                                 Width="60"
+-                                 Text="18"
+-                                 Padding="6,2"
+-                                 VerticalContentAlignment="Center"
+-                                 TextChanged="BubbleFontBox_TextChanged" />
+-                        <TextBlock Text="px"
+-                                   VerticalAlignment="Center"
+-                                   Margin="6,0,0,0"
+-                                   Foreground="#55514A" />
+-                    </StackPanel>
+-
+                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                         <TextBlock Text="글자색"
+                                    Width="64"
+@@ -554,22 +665,43 @@
+                                   SelectionChanged="BubbleFillColorComboBox_SelectionChanged" />
+                     </StackPanel>
+                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="배경색"
++                        <TextBlock Text="아웃라인색"
+                                    Width="64"
+                                    VerticalAlignment="Center"
+                                    Foreground="#55514A" />
+-                        <ComboBox x:Name="BubbleBackgroundColorComboBox"
++                        <ComboBox x:Name="BubbleStrokeColorComboBox"
+                                   Width="130"
+-                                  SelectionChanged="BubbleBackgroundColorComboBox_SelectionChanged" />
++                                  SelectionChanged="BubbleStrokeColorComboBox_SelectionChanged" />
++                    </StackPanel>
++                    <TextBlock Text="텍스트의 일부를 선택한 뒤 글꼴·글자색·아웃라인색을 바꾸면 그 부분에만 적용됩니다(선택이 없으면 전체)."
++                               TextWrapping="Wrap" FontSize="11" Foreground="#8A8479" Margin="0,2,0,0" />
++                    </StackPanel>
++                    </Border>
++
++                    <Border Style="{StaticResource InspectorGroup}">
++                    <StackPanel>
++                    <TextBlock Text="변형 · 배경 · 테두리" Style="{StaticResource GroupHeader}" />
++                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
++                        <TextBlock Text="변형"
++                                   Width="64"
++                                   VerticalAlignment="Center"
++                                   Foreground="#55514A"
++                                   ToolTip="네 모서리를 끌어 사변형으로 일그러뜨립니다." />
++                        <CheckBox x:Name="BubbleWarpShapeCheckBox" Content="테두리"
++                                  VerticalAlignment="Center" Margin="0,0,14,0"
++                                  Checked="BubbleWarpCheckBox_Changed" Unchecked="BubbleWarpCheckBox_Changed" />
++                        <CheckBox x:Name="BubbleWarpTextCheckBox" Content="글자"
++                                  VerticalAlignment="Center"
++                                  Checked="BubbleWarpCheckBox_Changed" Unchecked="BubbleWarpCheckBox_Changed" />
+                     </StackPanel>
+                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="아웃라인색"
++                        <TextBlock Text="배경색"
+                                    Width="64"
+                                    VerticalAlignment="Center"
+                                    Foreground="#55514A" />
+-                        <ComboBox x:Name="BubbleStrokeColorComboBox"
++                        <ComboBox x:Name="BubbleBackgroundColorComboBox"
+                                   Width="130"
+-                                  SelectionChanged="BubbleStrokeColorComboBox_SelectionChanged" />
++                                  SelectionChanged="BubbleBackgroundColorComboBox_SelectionChanged" />
+                     </StackPanel>
+                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                         <TextBlock Text="테두리색"
+@@ -677,7 +809,7 @@
+                                 Margin="0,4,0,14" />
+                     </StackPanel>
+ 
+-                    <Border Style="{StaticResource InspectorGroup}">
++                    <Border x:Name="BubbleTailSectionBorder" Style="{StaticResource InspectorGroup}">
+                     <StackPanel>
+                     <TextBlock Text="꼬리" Style="{StaticResource GroupHeader}" />
+                     <ListBox x:Name="BubbleTailListBox"
+@@ -787,6 +919,12 @@
+                                 Width="832"
+                                 Height="1216"
+                                 ClipToBounds="True" />
++                        <!-- 여러 페이지에 흘려 보여줄 본문 텍스트(칸·이미지 위, 클릭은 통과). -->
++                        <Grid x:Name="FlowTextLayer"
++                              Width="832"
++                              Height="1216"
++                              ClipToBounds="True"
++                              IsHitTestVisible="False" />
+                         <Canvas x:Name="PageOverlay"
+                                 Width="832"
+                                 Height="1216"
+diff --git a/MainWindow.xaml.cs b/MainWindow.xaml.cs
+index 1e3e9fa..4be22ee 100644
+--- a/MainWindow.xaml.cs
++++ b/MainWindow.xaml.cs
+@@ -55,6 +55,8 @@ public partial class MainWindow : Window
+         public string Title = string.Empty;
+         public int CurrentIndex;
+         public List<string> PageJsons = new();
++        // 프로젝트 전체 본문 텍스트(노벨 뷰어)의 직렬화 JSON. 페이지와 무관한 단일 객체.
++        public string FlowJson = "{}";
+     }
+ 
+     private readonly List<ComicPanel> _panels = new();
+@@ -81,6 +83,9 @@ public partial class MainWindow : Window
+     private Point _pendingDownPos;
+     private const double PendingMoveCancelThreshold = 6;
+     private bool _isLoadingInspector;
++    // 생성자 완료 전(특히 XAML 파싱 중 초기 Text 설정으로 TextChanged가 일찍 발화) 본문 텍스트 핸들러가
++    // 아직 만들어지지 않은 컨트롤을 건드려 NRE가 나는 것을 막는다. 생성자 끝에서 true.
++    private bool _flowReady;
+     private bool _isUpdatingBubbleList;
+     private bool _isUpdatingBubbleTailList;
+     private bool _isUpdatingImageList;
+@@ -150,6 +155,8 @@ public partial class MainWindow : Window
+         RefreshShortcutMenuText(); // 메뉴의 단축키 표기를 현재 설정으로 맞춘다
+         InitColorCombos(); // 팔레트 + 최근색 + '직접 지정…' 으로 색 콤보 구성(LoadWindowSettings 이후라 최근색 반영).
+         InitBubbleFontCombo(); // 시스템 글꼴 목록으로 말풍선 글꼴 콤보 구성.
++        InitFlowFontCombo();   // 시스템 글꼴 목록으로 본문 텍스트 글꼴 콤보 구성.
++        _flowReady = true;     // 모든 컨트롤이 만들어졌으므로 본문 텍스트 핸들러를 활성화.
+         Closing += (_, _) =>
+         {
+             SaveWindowSettings();
+@@ -212,7 +219,7 @@ public partial class MainWindow : Window
+             UpdateHoverTooltip(Mouse.DirectlyOver as DependencyObject);
+         }
+ 
+-        // 사용자 지정 가능한 명령 단축키(불러오기/저장/실행취소·다시실행/잘라내기·복사·붙여넣기/리셋/잠금).
++        // 사용자 지정 가능한 명령 단축키(불러오기/저장/실행취소·다시실행/잘라내기·복사·붙여넣기/리셋/잠금/텍스트 모드).
+         if (TryRunCustomShortcut(e))
+         {
+             e.Handled = true;
+@@ -603,8 +610,11 @@ public partial class MainWindow : Window
+ 
+     private void SetPageSize(double width, double height, bool updateTextBoxes)
+     {
+-        _pageWidth = Math.Clamp(width, 100, 5000);
+-        _pageHeight = Math.Clamp(height, 100, 5000);
++        var newW = Math.Clamp(width, 100, 5000);
++        var newH = Math.Clamp(height, 100, 5000);
++        var sizeChanged = newW != _pageWidth || newH != _pageHeight;
++        _pageWidth = newW;
++        _pageHeight = newH;
+ 
+         PageSurface.Width = _pageWidth;
+         PageSurface.Height = _pageHeight;
+@@ -612,6 +622,8 @@ public partial class MainWindow : Window
+         PanelCanvas.Height = _pageHeight;
+         PageOverlay.Width = _pageWidth;
+         PageOverlay.Height = _pageHeight;
++        FlowTextLayer.Width = _pageWidth;
++        FlowTextLayer.Height = _pageHeight;
+ 
+         if (updateTextBoxes)
+         {
+@@ -621,6 +633,11 @@ public partial class MainWindow : Window
+             _isLoadingInspector = false;
+         }
+ 
++        // 페이지 크기가 바뀐 경우에만 본문 분할을 다시 계산한다(페이지 전환 시 불필요한 재분할 회피).
++        if (sizeChanged)
++        {
++            RebuildFlowDocument();
++        }
+         UpdatePageFit();
+     }
+ 
+@@ -662,16 +679,14 @@ public partial class MainWindow : Window
+     // 페이지 배경을 선택한 색으로 적용한다(내보내기 결과 배경에도 반영됨).
+     private void ApplyPageBackground()
+     {
+-        var brush = new SolidColorBrush(CurrentPageBackgroundColor());
+         if (PageSurface != null)
+         {
+-            PageSurface.Background = brush;
++            PageSurface.Background = new SolidColorBrush(CurrentPageBackgroundColor());
+         }
+ 
+-        if (PageFrame != null)
+-        {
+-            PageFrame.Background = brush;
+-        }
++        // PageFrame(페이지 뒤 레이어)은 ApplyBackdrop이 단독으로 정한다:
++        // 텍스트 모드 ON이면 뒷배경색, OFF면 페이지 색(기존 동작). 페이지 전환 시에도 일관되게 유지.
++        ApplyBackdrop();
+     }
+ 
+     private void ToggleInspector_Click(object sender, RoutedEventArgs e)
+@@ -724,6 +739,14 @@ public partial class MainWindow : Window
+             return;
+         }
+ 
++        // 편집 모드라도 커서가 페이지 바깥(여백)에 있으면 휠로 페이지를 넘긴다.
++        if (PageSurface != null && !IsMouseOverElement(PageSurface, e))
++        {
++            NavigatePage(e.Delta > 0 ? -1 : 1);
++            e.Handled = true;
++            return;
++        }
++
+         // 휠 크기조절은 '이미 선택된' 오브젝트에만(먼저 선택 → 휠로 크기 조절).
+         // 커서가 선택 오브젝트의 '영역' 위에 있으면, 앞에 다른 오브젝트가 가리고 있어도 적용한다(기하 판정).
+ 
+@@ -829,7 +852,8 @@ public partial class MainWindow : Window
+             CurrentPageIndex = _currentPageIndex,
+             // 이미지가 실행 파일 폴더(또는 하위)면 상대 경로로, 아니면 절대 경로로 저장한다.
+             // → 실행 파일·자동저장을 이미지와 함께 옮겨도 다음 실행 때 그대로 열린다.
+-            Pages = CaptureProjectPages(null)
++            Pages = CaptureProjectPages(null),
++            FlowText = _flow.Clone()
+         };
+         return JsonSerializer.Serialize(project);
+     }
+@@ -882,6 +906,7 @@ public partial class MainWindow : Window
+         ReplacePages(project.Pages);
+         _currentPageIndex = Math.Clamp(project.CurrentPageIndex, 0, _pages.Count - 1);
+         LoadPage(_pages[_currentPageIndex]);
++        ApplyFlowText(project.FlowText); // 본문 텍스트·서식 복원(실행취소/자동저장 포함).
+         UpdatePageList();
+     }
+ 
+@@ -907,7 +932,8 @@ public partial class MainWindow : Window
+         {
+             Title = ComicTitleTextBox.Text.Trim(),
+             CurrentIndex = _currentPageIndex,
+-            PageJsons = new List<string>(_pages.Count)
++            PageJsons = new List<string>(_pages.Count),
++            FlowJson = JsonSerializer.Serialize(_flow)
+         };
+ 
+         var full = forceFull || _baseline == null || _historyStructuralPending
+@@ -938,7 +964,8 @@ public partial class MainWindow : Window
+     {
+         var pages = string.Join(",", snapshot.PageJsons);
+         var title = JsonSerializer.Serialize(snapshot.Title); // 따옴표·이스케이프 포함
+-        return $"{{\"Title\":{title},\"CurrentPageIndex\":{snapshot.CurrentIndex},\"Pages\":[{pages}]}}";
++        var flow = string.IsNullOrEmpty(snapshot.FlowJson) ? "{}" : snapshot.FlowJson;
++        return $"{{\"Title\":{title},\"CurrentPageIndex\":{snapshot.CurrentIndex},\"Pages\":[{pages}],\"FlowText\":{flow}}}";
+     }
+ 
+     // 변화 감지용 경량 서명. 편집은 현재 페이지에서만 일어나므로, 전체가 아니라
+@@ -951,7 +978,7 @@ public partial class MainWindow : Window
+         var current = _currentPageIndex >= 0 && _currentPageIndex < _pages.Count
+             ? JsonSerializer.Serialize(_pages[_currentPageIndex])
+             : string.Empty;
+-        return $"{ComicTitleTextBox.Text}|{_currentPageIndex}|{_pages.Count}|{names}|{current}";
++        return $"{ComicTitleTextBox.Text}|{_currentPageIndex}|{_pages.Count}|{names}|{current}|{JsonSerializer.Serialize(_flow)}";
+     }
+ 
+     // 마지막 기준선과 달라졌으면 변경분을 undo 스택에 쌓는다.
+@@ -1219,7 +1246,7 @@ public partial class MainWindow : Window
+     }
+ 
+     // 앱 버전(창 제목 등에 표시).
+-    private const string AppVersion = "v0.1.1";
++    private const string AppVersion = "v0.1.2";
+ 
+     private void UpdateWindowTitle()
+     {
+diff --git a/README.md b/README.md
+index f052f42..7bd1572 100644
+--- a/README.md
++++ b/README.md
+@@ -20,17 +20,17 @@
+ 
+ ### 말풍선
+ - 한 칸에 여러 말풍선, 드래그 이동·크기 조절
+-- 모양: 원형/사각, 구름/폭발, 플래시, 집중선, 속도선, 테두리 없음
++- 모양: 원형/사각, 구름/폭발, 플래시, 집중선, 속도선
+ - 말풍선 꼬리 — 세 점(시작·중간·끝)으로 곡선 조절, 안으로 깎기, 여러 개 추가
+ - 겹친 말풍선의 외곽선 자동 병합
+-- 글자색·배경색·아웃라인색
++- 글꼴·색 지정
+ 
+ ### 저장·내보내기
+ - 프로젝트 저장/불러오기(`.kfjson`)
+ - 이미지는 **상대 경로로 저장**
+ - 작업 자동 저장 및 다음 실행 시 복원
+ - 자동저장을 실행 파일과 같은 폴더에 보관
+-- 페이지를 이미지 파일로 내보내기
++- 페이지를 이미지 파일로 내보내기(움직이는 Webp 지원)
+ 
+ ---
+ 
+diff --git a/src/MainWindow/MainWindow.Bubbles.cs b/src/MainWindow/MainWindow.Bubbles.cs
+index 35bc6e0..3afd6d7 100644
+--- a/src/MainWindow/MainWindow.Bubbles.cs
++++ b/src/MainWindow/MainWindow.Bubbles.cs
+@@ -44,10 +44,30 @@ public partial class MainWindow : Window
+         ApplyBubbleAutoFit(bubble);
+ 
+         UpdateBubbleTailHandles(bubble);
++        ApplyBubbleTextWarp(bubble); // 글자 모서리 조절 파라미터 갱신(크기·변위 변화 반영).
+         // 이 말풍선이 속한 칸만 갱신해도 충분하다(다른 칸의 도형은 영향받지 않음).
+         UpdateMergedBubbleOutlines(bubble.OwnerPanel);
+     }
+ 
++    // 글자 워프 파라미터(컨테이너 크기·모서리 변위)를 글자 요소에 전달한다. OFF/변위 0이면 워프 해제.
++    private static void ApplyBubbleTextWarp(SpeechBubble bubble)
++    {
++        var tb = bubble.TextBlock;
++        if (bubble.WarpText && HasCornerWarp(bubble.CornerOffsets))
++        {
++            tb.WarpContainerSize = new Size(Math.Max(1, bubble.Container.Width), Math.Max(1, bubble.Container.Height));
++            // 새 배열로 전달해 DP 변경(재렌더)이 감지되게 한다.
++            tb.WarpOffsets = new[]
++            {
++                bubble.CornerOffsets[0], bubble.CornerOffsets[1], bubble.CornerOffsets[2], bubble.CornerOffsets[3]
++            };
++        }
++        else
++        {
++            tb.WarpOffsets = null;
++        }
++    }
++
+     // 말풍선 안에 글자가 들어가도록, 설정 글자 크기(MaxFontSize)를 최대로 두고
+     // 들어가지 않으면 실제 렌더 크기(TextBlock.FontSize)를 줄인다(이분 탐색).
+     private static void ApplyBubbleAutoFit(SpeechBubble bubble)
+@@ -196,7 +216,11 @@ public partial class MainWindow : Window
+             bubble.ShapePath.Data = null;
+             bubble.ShapePath.Clip = null;
+ 
+-            var signature = $"{bubble.Shape}|{bubble.Container.Width:F1}|{bubble.Container.Height:F1}|{bubble.ShapeCount}|{bubble.ShapeStrength:F1}|{bubble.ShapeIrregularity:F1}|{ToHex(bubble.TextBlock.Fill)}";
++            // 모서리 조절(도형)이 켜지면 변위가 바뀔 때마다 선을 다시 그려야 하므로 시그니처에 포함한다.
++            var warpSig = bubble.WarpShape
++                ? string.Join(",", bubble.CornerOffsets.Select(p => $"{p.X:F1}:{p.Y:F1}"))
++                : "off";
++            var signature = $"{bubble.Shape}|{bubble.Container.Width:F1}|{bubble.Container.Height:F1}|{bubble.ShapeCount}|{bubble.ShapeStrength:F1}|{bubble.ShapeIrregularity:F1}|{ToHex(bubble.TextBlock.Fill)}|{warpSig}";
+             if (signature == bubble.LineHostSignature)
+             {
+                 return; // 위치만 바뀐 경우: 로컬 좌표라 그대로 따라오므로 재생성 불필요.
+@@ -233,20 +257,81 @@ public partial class MainWindow : Window
+             return null;
+         }
+ 
+-        var offset = new TranslateTransform(GetCanvasLeft(bubble.Container), GetCanvasTop(bubble.Container));
++        // 먼저 본체+꼬리를 로컬 좌표(컨테이너 원점 기준)에서 합친다.
+         Geometry shape = bubble.BodyPath.Data.Clone();
+-        shape.Transform = offset;
+         foreach (var tail in bubble.Tails)
+         {
+             var tailGeometry = CreateTailGeometry(tail);
+-            tailGeometry.Transform = offset;
+             var tailMode = tail.TailInward ? GeometryCombineMode.Exclude : GeometryCombineMode.Union;
+             shape = Geometry.Combine(shape, tailGeometry, tailMode, null);
+         }
+ 
++        // 모서리 조절(도형)이 켜져 있고 변위가 있으면 사변형으로 일그러뜨린다.
++        if (bubble.WarpShape && HasCornerWarp(bubble.CornerOffsets))
++        {
++            shape = WarpGeometry(shape, Math.Max(1, bubble.Container.Width), Math.Max(1, bubble.Container.Height), bubble.CornerOffsets);
++        }
++
++        // 마지막에 오버레이 좌표로 평행이동.
++        shape.Transform = new TranslateTransform(GetCanvasLeft(bubble.Container), GetCanvasTop(bubble.Container));
+         return shape;
+     }
+ 
++    // --- 모서리 조절(사변형 워프) 공용 ---
++
++    private static bool HasCornerWarp(Point[] o)
++        => o[0].X != 0 || o[0].Y != 0 || o[1].X != 0 || o[1].Y != 0
++           || o[2].X != 0 || o[2].Y != 0 || o[3].X != 0 || o[3].Y != 0;
++
++    // 로컬 좌표(0..w, 0..h)의 점을 네 모서리(오프셋 반영)가 만드는 사변형으로 이중선형 매핑한다.
++    // 변위가 모두 0이면 항등(원래 좌표 그대로).
++    internal static Point WarpPoint(double x, double y, double w, double h, Point[] o)
++    {
++        var u = w > 0 ? x / w : 0;
++        var v = h > 0 ? y / h : 0;
++        var tlX = o[0].X;          var tlY = o[0].Y;
++        var trX = w + o[1].X;      var trY = o[1].Y;
++        var brX = w + o[2].X;      var brY = h + o[2].Y;
++        var blX = o[3].X;          var blY = h + o[3].Y;
++        var nx = (1 - u) * (1 - v) * tlX + u * (1 - v) * trX + u * v * brX + (1 - u) * v * blX;
++        var ny = (1 - u) * (1 - v) * tlY + u * (1 - v) * trY + u * v * brY + (1 - u) * v * blY;
++        return new Point(nx, ny);
++    }
++
++    // 곡선을 포함한 도형을 잘게 직선화한 뒤 각 점을 워프해 새 도형으로 만든다(비아핀 변환이라 직접 Transform 불가).
++    private static Geometry WarpGeometry(Geometry geo, double w, double h, Point[] o)
++    {
++        var flat = geo.GetFlattenedPathGeometry(0.2, ToleranceType.Absolute);
++        var result = new PathGeometry { FillRule = flat.FillRule };
++        foreach (var fig in flat.Figures)
++        {
++            var nf = new PathFigure
++            {
++                IsClosed = fig.IsClosed,
++                IsFilled = fig.IsFilled,
++                StartPoint = WarpPoint(fig.StartPoint.X, fig.StartPoint.Y, w, h, o)
++            };
++            foreach (var seg in fig.Segments)
++            {
++                if (seg is PolyLineSegment pls)
++                {
++                    var pts = new PointCollection();
++                    foreach (var p in pls.Points)
++                    {
++                        pts.Add(WarpPoint(p.X, p.Y, w, h, o));
++                    }
++                    nf.Segments.Add(new PolyLineSegment(pts, seg.IsStroked));
++                }
++                else if (seg is LineSegment lseg)
++                {
++                    nf.Segments.Add(new LineSegment(WarpPoint(lseg.Point.X, lseg.Point.Y, w, h, o), lseg.IsStroked));
++                }
++            }
++            result.Figures.Add(nf);
++        }
++        return result;
++    }
++
+     private static Geometry CreateTailGeometry(BubbleTail tail)
+     {
+         var start = new Point(tail.StartX, tail.StartY);
+@@ -347,6 +432,7 @@ public partial class MainWindow : Window
+         PositionImageSelectionBox();
+         PositionTextRegionHandles();
+         PositionPanelCornerHandles();
++        PositionBubbleCornerHandles();
+         EnsureTailHandles();
+ 
+         var tail = _selectedBubbleTail;
+@@ -621,6 +707,84 @@ public partial class MainWindow : Window
+         PositionPanelCornerHandles();
+     }
+ 
++    // --- 말풍선 모서리 조절 핸들(보라색, 칸 핸들과 구분) ---
++
++    private Thumb[]? _bubbleCornerHandles;
++
++    private void EnsureBubbleCornerHandles()
++    {
++        if (_bubbleCornerHandles == null)
++        {
++            var color = Color.FromRgb(150, 70, 180); // 보라색
++            _bubbleCornerHandles = new[]
++            {
++                CreateCornerHandle(color, Cursors.SizeNWSE), // TL
++                CreateCornerHandle(color, Cursors.SizeNESW), // TR
++                CreateCornerHandle(color, Cursors.SizeNWSE), // BR
++                CreateCornerHandle(color, Cursors.SizeNESW)  // BL
++            };
++            for (var i = 0; i < 4; i++)
++            {
++                var index = i;
++                _bubbleCornerHandles[i].DragDelta += (_, e) => DragBubbleCorner(index, e);
++            }
++        }
++
++        foreach (var handle in _bubbleCornerHandles)
++        {
++            if (!PageOverlay.Children.Contains(handle))
++            {
++                PageOverlay.Children.Add(handle);
++                Panel.SetZIndex(handle, int.MaxValue - 1);
++            }
++        }
++    }
++
++    private void PositionBubbleCornerHandles()
++    {
++        EnsureBubbleCornerHandles();
++
++        // 모서리 조절(도형/글자 중 하나라도 ON)일 때만 핸들을 보인다.
++        var show = _selectionKind == SelectionKind.Bubble && _selectedBubble != null
++                   && (_selectedBubble.WarpShape || _selectedBubble.WarpText);
++        var visibility = show ? Visibility.Visible : Visibility.Hidden;
++        foreach (var handle in _bubbleCornerHandles!)
++        {
++            handle.Visibility = visibility;
++        }
++
++        if (!show || _selectedBubble == null)
++        {
++            return;
++        }
++
++        var origin = GetBubblePageOrigin(_selectedBubble);
++        var w = _selectedBubble.Container.Width;
++        var h = _selectedBubble.Container.Height;
++        var o = _selectedBubble.CornerOffsets;
++
++        // TL,TR,BR,BL (CornerOffsets 순서와 동일)
++        PlaceTailHandle(_bubbleCornerHandles[0], origin.X + 0 + o[0].X, origin.Y + 0 + o[0].Y);
++        PlaceTailHandle(_bubbleCornerHandles[1], origin.X + w + o[1].X, origin.Y + 0 + o[1].Y);
++        PlaceTailHandle(_bubbleCornerHandles[2], origin.X + w + o[2].X, origin.Y + h + o[2].Y);
++        PlaceTailHandle(_bubbleCornerHandles[3], origin.X + 0 + o[3].X, origin.Y + h + o[3].Y);
++    }
++
++    private void DragBubbleCorner(int index, DragDeltaEventArgs e)
++    {
++        if (_selectedBubble == null || index < 0 || index > 3)
++        {
++            return;
++        }
++
++        var o = _selectedBubble.CornerOffsets;
++        o[index] = new Point(o[index].X + e.HorizontalChange, o[index].Y + e.VerticalChange);
++        _historyDirty = true;
++
++        UpdateBubbleGeometry(_selectedBubble); // 도형(+글자 워프 파라미터) 갱신.
++        PositionBubbleCornerHandles();
++    }
++
+     // 말풍선 컨테이너의 (0,0)을 페이지(PageOverlay) 좌표로 변환한다.
+     // 크롭된 말풍선은 칸 오버레이에 들어 있으므로 칸 오버레이 원점을 더해 준다.
+     private Point GetBubblePageOrigin(SpeechBubble bubble)
+diff --git a/src/MainWindow/MainWindow.ColorPicker.cs b/src/MainWindow/MainWindow.ColorPicker.cs
+index 80d0711..67b7026 100644
+--- a/src/MainWindow/MainWindow.ColorPicker.cs
++++ b/src/MainWindow/MainWindow.ColorPicker.cs
+@@ -30,10 +30,13 @@ public partial class MainWindow
+         _colorCombos.Add((BubbleStrokeColorComboBox, true));
+         _colorCombos.Add((BubbleBackgroundColorComboBox, true));
+         _colorCombos.Add((ImageGradientColorComboBox, true)); // 투명 포함(투명=이미지 사라짐)
+-        _colorCombos.Add((PanelBackgroundColorComboBox, false)); // 칸 배경(단색)
+-        _colorCombos.Add((PanelBorderColorComboBox, false));     // 칸 테두리(단색)
++        _colorCombos.Add((PanelBackgroundColorComboBox, true));  // 칸 배경(없음=투명)
++        _colorCombos.Add((PanelBorderColorComboBox, true));      // 칸 테두리(없음=투명)
+         _colorCombos.Add((PageBackgroundColorComboBox, true));   // 페이지 배경(투명 포함 → 투명 내보내기)
+         _colorCombos.Add((BubbleBorderColorComboBox, false));    // 말풍선 테두리(단색)
++        _colorCombos.Add((FlowColorComboBox, false));            // 본문 텍스트 색(단색)
++        _colorCombos.Add((FlowOutlineColorComboBox, true));      // 본문 텍스트 아웃라인(없음=투명)
++        _colorCombos.Add((FlowBackdropColorComboBox, true));     // 페이지 뒤 배경(없음=투명)
+ 
+         RebuildColorCombos();
+ 
+@@ -45,6 +48,9 @@ public partial class MainWindow
+         SelectComboColor(PanelBorderColorComboBox, "#000000");       // 기본 검정
+         SelectComboColor(PageBackgroundColorComboBox, "#FFFFFF");     // 기본 흰색
+         SelectComboColor(BubbleBorderColorComboBox, "#000000");      // 기본 검정
++        SelectComboColor(FlowColorComboBox, "#FFFFFF");             // 기본 흰색
++        SelectComboColor(FlowOutlineColorComboBox, "#000000");       // 기본 검정
++        SelectComboColor(FlowBackdropColorComboBox, "#FFFFFF");      // 기본 흰색
+     }
+ 
+     // 모든 색 콤보를 [없음?]+[최근색]+[팔레트]+[직접 지정…] 순으로 다시 채운다(현재 선택은 유지).
+diff --git a/src/MainWindow/MainWindow.FlowText.cs b/src/MainWindow/MainWindow.FlowText.cs
+new file mode 100644
+index 0000000..d2e7ba0
+--- /dev/null
++++ b/src/MainWindow/MainWindow.FlowText.cs
+@@ -0,0 +1,835 @@
++using System.Text.Json;
++using System.Windows;
++using System.Windows.Controls;
++using System.Windows.Documents;
++using System.Windows.Media;
++
++namespace KomaForge;
++
++public partial class MainWindow : Window
++{
++    // 프로젝트 전체에 걸쳐 페이지별로 흘려 표시하는 본문 텍스트(노벨 뷰어). 칸·이미지 위 레이어.
++    private FlowTextData _flow = new();
++    private FlowDocument? _flowDoc;
++    private DocumentPaginator? _flowPaginator;
++    private PageVisualHost? _flowHost;
++    // 렌더 키색 → (실제 채움색, 아웃라인색) 매핑. 구간마다 고유 키색을 부여해 같은 글자색이라도
++    // 아웃라인을 독립적으로 그룹·렌더한다(키색은 그리지 않으므로 화면에 안 보임). RebuildFlowDocument에서 갱신.
++    private System.Collections.Generic.Dictionary<Color, (Color Fill, Color Outline)> _flowRenderMap = new();
++    private bool _flowNeedOutline; // 불투명 아웃라인이 하나라도 있으면 그룹 경로로 렌더.
++
++    // 분할된 한 페이지의 Visual을 그대로 호스팅하는 경량 요소(DocumentPageView가 public이 아니라 직접 구현).
++    private sealed class PageVisualHost : FrameworkElement
++    {
++        private Visual? _child;
++
++        public void SetChild(Visual? v)
++        {
++            if (ReferenceEquals(_child, v))
++            {
++                return;
++            }
++            if (_child != null)
++            {
++                RemoveVisualChild(_child);
++            }
++            _child = v;
++            if (_child != null)
++            {
++                AddVisualChild(_child);
++            }
++            InvalidateMeasure();
++        }
++
++        protected override int VisualChildrenCount => _child == null ? 0 : 1;
++        protected override Visual GetVisualChild(int index) => _child!;
++    }
++
++    private void EnsureFlowHost()
++    {
++        if (_flowHost != null)
++        {
++            return;
++        }
++
++        _flowHost = new PageVisualHost
++        {
++            IsHitTestVisible = false,
++            HorizontalAlignment = HorizontalAlignment.Left,
++            VerticalAlignment = VerticalAlignment.Top
++        };
++        FlowTextLayer.Children.Add(_flowHost);
++    }
++
++    // _flow의 텍스트·서식·현재 페이지 크기로 FlowDocument를 만들어 '페이지 단위 분할'을 준비한다.
++    // 텍스트·서식·페이지 크기가 바뀔 때만 호출(페이지 전환·추가/삭제 시엔 호출하지 않음 → 분할 재계산 회피).
++    private void RebuildFlowDocument()
++    {
++        EnsureFlowHost();
++
++        if (!_flow.Enabled || string.IsNullOrEmpty(_flow.Text))
++        {
++            _flowDoc = null;
++            _flowPaginator = null;
++            _flowHost!.SetChild(null);
++            return;
++        }
++
++        var doc = new FlowDocument
++        {
++            PageWidth = _pageWidth,
++            PageHeight = _pageHeight,
++            PagePadding = new Thickness(_flow.MarginLeft, _flow.MarginTop, _flow.MarginRight, _flow.MarginBottom),
++            ColumnWidth = double.PositiveInfinity, // 단일 컬럼.
++            FontSize = _flow.FontSize > 0 ? _flow.FontSize : 20,
++            TextAlignment = ParseFlowAlignment(_flow.Alignment),
++            Foreground = new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color))
++        };
++        if (!string.IsNullOrEmpty(_flow.FontFamily))
++        {
++            try { doc.FontFamily = new FontFamily(_flow.FontFamily); } catch { /* 알 수 없는 글꼴은 기본 사용 */ }
++        }
++
++        var defColor = string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color;
++        var defOutline = string.IsNullOrEmpty(_flow.OutlineColor) ? "#00FFFFFF" : _flow.OutlineColor;
++        _flowRenderMap = new System.Collections.Generic.Dictionary<Color, (Color, Color)>();
++
++        var runs = _flow.Runs.Count > 0 ? _flow.Runs : MakeDefaultRuns(_flow.Text);
++
++        // 불투명 아웃라인(기본값 또는 구간)이 하나라도 있으면 그룹 경로로 렌더한다.
++        _flowNeedOutline = SafeColor(defOutline).A > 0;
++        if (!_flowNeedOutline)
++        {
++            foreach (var run in runs)
++            {
++                if (!string.IsNullOrEmpty(run.OutlineColor) && SafeColor(run.OutlineColor).A > 0)
++                {
++                    _flowNeedOutline = true;
++                    break;
++                }
++            }
++        }
++
++        // (채움색,아웃라인색) 조합마다 고유 키색 부여(같은 채움색이라도 아웃라인이 다르면 다른 그룹).
++        var pairKeys = new System.Collections.Generic.Dictionary<(Color, Color), Color>();
++        var keySeq = 0;
++
++        // 구간(런)을 순서대로 문단으로 만든다. 런 텍스트 안의 줄바꿈마다 새 문단으로 나눈다.
++        // 색/글꼴은 구간이 지정했을 때만 Run에 적용하고, 없으면 문서 기본값을 상속한다.
++        var para = NewFlowParagraph();
++        foreach (var run in runs)
++        {
++            var parts = run.Text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
++            for (var i = 0; i < parts.Length; i++)
++            {
++                if (i > 0)
++                {
++                    doc.Blocks.Add(para);
++                    para = NewFlowParagraph();
++                }
++                if (parts[i].Length == 0)
++                {
++                    continue;
++                }
++
++                var wpfRun = new Run(parts[i]);
++                var fillColor = SafeColor(string.IsNullOrEmpty(run.Color) ? defColor : run.Color);
++                var outlineColor = SafeColor(string.IsNullOrEmpty(run.OutlineColor) ? defOutline : run.OutlineColor);
++                if (!string.IsNullOrEmpty(run.FontFamily))
++                {
++                    try { wpfRun.FontFamily = new FontFamily(run.FontFamily); } catch { /* 알 수 없는 글꼴은 기본 사용 */ }
++                }
++                if (_flowNeedOutline)
++                {
++                    // 그룹 경로: 모든 구간에 고유 키색을 전경색으로 부여(키색은 그리지 않음, 실제 색은 렌더 시 사용).
++                    wpfRun.Foreground = new SolidColorBrush(FlowRenderKey(fillColor, outlineColor, pairKeys, ref keySeq));
++                }
++                else if (!string.IsNullOrEmpty(run.Color))
++                {
++                    wpfRun.Foreground = new SolidColorBrush(fillColor);
++                }
++                para.Inlines.Add(wpfRun);
++            }
++        }
++        doc.Blocks.Add(para);
++
++        _flowDoc = doc;
++        _flowPaginator = ((IDocumentPaginatorSource)doc).DocumentPaginator;
++        _flowPaginator.PageSize = new Size(_pageWidth, _pageHeight);
++        UpdateFlowTextLayer();
++    }
++
++    private Paragraph NewFlowParagraph()
++    {
++        var p = new Paragraph { Margin = new Thickness(0) };
++        if (_flow.LineHeight > 0)
++        {
++            p.LineHeight = _flow.LineHeight;
++        }
++        return p;
++    }
++
++    // 현재 페이지 인덱스에 해당하는 분량만 표시한다. 인덱스가 분할된 페이지 수를 넘으면 빈 화면(잘림),
++    // 페이지를 추가해 그 인덱스가 분량 안에 들어오면 다음 분량이 보인다.
++    private void UpdateFlowTextLayer()
++    {
++        if (_flowHost == null)
++        {
++            return;
++        }
++
++        if (_flowPaginator == null || _currentPageIndex < 0)
++        {
++            _flowHost.SetChild(null);
++            return;
++        }
++
++        try
++        {
++            if (!_flowPaginator.IsPageCountValid)
++            {
++                _flowPaginator.ComputePageCount(); // 전체 분할(최초/텍스트 변경 시 1회).
++            }
++
++            if (_currentPageIndex >= _flowPaginator.PageCount)
++            {
++                _flowHost.SetChild(null); // 분량 부족 → 잘려서 안 보임.
++                return;
++            }
++
++            var page = _flowPaginator.GetPage(_currentPageIndex);
++            _flowHost.SetChild(BuildFlowPageVisual(page.Visual));
++        }
++        catch
++        {
++            _flowHost.SetChild(null);
++        }
++    }
++
++    // 저장/복원에서 받은 데이터로 본문을 적용하고(인스펙터 갱신) 다시 분할한다.
++    private void ApplyFlowText(FlowTextData? data)
++    {
++        _flow = data?.Clone() ?? new FlowTextData();
++        // 구버전 호환: 런이 없으면 Text 한 덩어리를 서식 없는 런 하나로 마이그레이션.
++        if (_flow.Runs.Count == 0 && !string.IsNullOrEmpty(_flow.Text))
++        {
++            _flow.Runs = MakeDefaultRuns(_flow.Text);
++        }
++        LoadFlowInspector();
++        ApplyBackdrop();
++        RebuildFlowDocument();
++    }
++
++    // 페이지 뒤(PageFrame)의 배경을 정한다. 텍스트 모드 ON이면 단일 뒷배경색, OFF면 페이지 색(기존 동작).
++    // PageFrame.Background의 유일한 설정 지점(ApplyPageBackground도 여기로 위임).
++    private void ApplyBackdrop()
++    {
++        if (PageFrame == null)
++        {
++            return;
++        }
++        var color = _flow.Enabled
++            ? SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor)
++            : CurrentPageBackgroundColor();
++        PageFrame.Background = new SolidColorBrush(color);
++    }
++
++    private static TextAlignment ParseFlowAlignment(string a) => a switch
++    {
++        "Center" => TextAlignment.Center,
++        "Right" => TextAlignment.Right,
++        "Justify" => TextAlignment.Justify,
++        _ => TextAlignment.Left
++    };
++
++    // --- 인스펙터 텍스트 섹션 ---
++
++    private void InitFlowFontCombo()
++    {
++        if (FlowFontFamilyComboBox == null)
++        {
++            return;
++        }
++
++        var families = Fonts.SystemFontFamilies
++            .Select(f => f.Source)
++            .Where(s => !string.IsNullOrWhiteSpace(s))
++            .Distinct()
++            .OrderBy(s => s, System.StringComparer.CurrentCultureIgnoreCase);
++
++        FlowFontFamilyComboBox.Items.Clear();
++        foreach (var name in families)
++        {
++            FlowFontFamilyComboBox.Items.Add(new ComboBoxItem
++            {
++                Content = new TextBlock { Text = name, FontFamily = new FontFamily(name) },
++                Tag = name
++            });
++        }
++
++        SelectFlowFontInCombo(_flow.FontFamily); // 시작 시 기본 글꼴(말풍선과 동일) 선택.
++    }
++
++    // _flow 값을 인스펙터 컨트롤에 채운다(불러오기·복원 시). 변경 이벤트는 _isLoadingInspector로 억제.
++    private void LoadFlowInspector()
++    {
++        if (FlowTextBox == null)
++        {
++            return;
++        }
++
++        _isLoadingInspector = true;
++        FlowTextModeCheckBox.IsChecked = _flow.Enabled;
++        FlowTextSectionBorder.Visibility = _flow.Enabled ? Visibility.Visible : Visibility.Collapsed;
++        FlowTextBox.Text = _flow.Text;
++        // 텍스트박스가 줄바꿈을 \r\n으로 정규화할 수 있으므로, 보이는 텍스트에 런·_flow.Text를 맞춘다.
++        if (RunsText(_flow.Runs) != FlowTextBox.Text)
++        {
++            _flow.Runs = SpliceRuns(_flow.Runs, RunsText(_flow.Runs), FlowTextBox.Text);
++            _flow.Text = FlowTextBox.Text;
++        }
++        FlowFontSizeBox.Text = $"{_flow.FontSize:0.##}";
++        FlowLineHeightBox.Text = $"{_flow.LineHeight:0.##}";
++        FlowMarginLeftBox.Text = $"{_flow.MarginLeft:0.##}";
++        FlowMarginTopBox.Text = $"{_flow.MarginTop:0.##}";
++        FlowMarginRightBox.Text = $"{_flow.MarginRight:0.##}";
++        FlowMarginBottomBox.Text = $"{_flow.MarginBottom:0.##}";
++        foreach (ComboBoxItem item in FlowAlignmentComboBox.Items)
++        {
++            item.IsSelected = item.Tag as string == _flow.Alignment;
++        }
++        SelectFlowFontInCombo(_flow.FontFamily);
++        SelectBubbleColorInCombo(FlowColorComboBox,
++            new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color)));
++        SelectBubbleColorInCombo(FlowOutlineColorComboBox,
++            new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.OutlineColor) ? TransparentHex : _flow.OutlineColor)));
++        SelectBubbleColorInCombo(FlowBackdropColorComboBox,
++            new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor)));
++        _isLoadingInspector = false;
++    }
++
++    private void SelectFlowFontInCombo(string family)
++    {
++        foreach (ComboBoxItem item in FlowFontFamilyComboBox.Items)
++        {
++            if (item.Tag is string tag && string.Equals(tag, family, System.StringComparison.OrdinalIgnoreCase))
++            {
++                FlowFontFamilyComboBox.SelectedItem = item;
++                return;
++            }
++        }
++        FlowFontFamilyComboBox.SelectedIndex = -1; // 기본 글꼴.
++    }
++
++    // 텍스트 모드 ON/OFF 토글(Ctrl+T). 숨겨진 체크박스를 통해 섹션 표시·본문 오버레이를 함께 갱신.
++    private void ToggleTextMode()
++    {
++        if (FlowTextModeCheckBox == null)
++        {
++            return;
++        }
++        FlowTextModeCheckBox.IsChecked = !(FlowTextModeCheckBox.IsChecked == true);
++        UpdateStatus(FlowTextModeCheckBox.IsChecked == true ? "텍스트 모드 ON" : "텍스트 모드 OFF");
++    }
++
++    private void FlowTextModeCheckBox_Changed(object sender, RoutedEventArgs e)
++    {
++        // 섹션 표시는 로딩 중에도 상태에 맞춰 갱신한다(체크박스가 토글되는 즉시 반영).
++        if (FlowTextSectionBorder != null)
++        {
++            FlowTextSectionBorder.Visibility =
++                FlowTextModeCheckBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
++        }
++
++        if (!_flowReady || _isLoadingInspector)
++        {
++            return;
++        }
++
++        _flow.Enabled = FlowTextModeCheckBox.IsChecked == true;
++        _historyDirty = true;
++        ApplyBackdrop();       // ON/OFF에 따라 페이지 뒤 배경색을 켜거나 흰색으로 되돌린다.
++        RebuildFlowDocument(); // ON/OFF에 따라 본문 오버레이를 켜거나 지운다.
++    }
++
++    private void FlowTextBox_TextChanged(object sender, TextChangedEventArgs e)
++    {
++        if (!_flowReady || _isLoadingInspector)
++        {
++            return;
++        }
++        // 편집(타이핑·삭제·붙여넣기)을 '한 구간 치환'으로 보고 런 스팬을 그 변경만큼만 갱신해 구간 서식을 보존한다.
++        _flow.Runs = SpliceRuns(_flow.Runs, _flow.Text ?? string.Empty, FlowTextBox.Text);
++        _flow.Text = FlowTextBox.Text;
++        _historyDirty = true;
++        RebuildFlowDocument();
++    }
++
++    private void FlowStyleBox_Changed(object sender, TextChangedEventArgs e)
++    {
++        if (!_flowReady || _isLoadingInspector)
++        {
++            return;
++        }
++        _flow.FontSize = System.Math.Clamp(ParseDoubleOr(FlowFontSizeBox.Text, 20), 1, 500);
++        _flow.LineHeight = System.Math.Max(0, ParseDoubleOr(FlowLineHeightBox.Text, 0));
++        _flow.MarginLeft = System.Math.Max(0, ParseDoubleOr(FlowMarginLeftBox.Text, 0));
++        _flow.MarginTop = System.Math.Max(0, ParseDoubleOr(FlowMarginTopBox.Text, 0));
++        _flow.MarginRight = System.Math.Max(0, ParseDoubleOr(FlowMarginRightBox.Text, 0));
++        _flow.MarginBottom = System.Math.Max(0, ParseDoubleOr(FlowMarginBottomBox.Text, 0));
++        _historyDirty = true;
++        RebuildFlowDocument();
++    }
++
++    private void FlowAlignmentComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (!_flowReady || _isLoadingInspector)
++        {
++            return;
++        }
++        _flow.Alignment = (FlowAlignmentComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Left";
++        _historyDirty = true;
++        RebuildFlowDocument();
++    }
++
++    private void FlowFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (!_flowReady || _isLoadingInspector)
++        {
++            return;
++        }
++        var family = (FlowFontFamilyComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? string.Empty;
++        // 선택 구간이 있으면 그 구간만, 없으면 문서 기본 글꼴.
++        ApplyFlowSelectionStyle(
++            r => r.FontFamily = string.IsNullOrEmpty(family) ? null : family,
++            () => _flow.FontFamily = family);
++    }
++
++    private void FlowColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (!_flowReady)
++        {
++            return;
++        }
++        OnColorComboChanged(FlowColorComboBox, true,
++            () => SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color),
++            c => ApplyFlowSelectionStyle(
++                r => r.Color = ColorToHex(c),
++                () => _flow.Color = ColorToHex(c)),
++            Colors.Black);
++    }
++
++    private void FlowOutlineColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (!_flowReady)
++        {
++            return;
++        }
++        OnColorComboChanged(FlowOutlineColorComboBox, true,
++            () => SafeColor(string.IsNullOrEmpty(_flow.OutlineColor) ? "#00FFFFFF" : _flow.OutlineColor),
++            c => ApplyFlowSelectionStyle(
++                r => r.OutlineColor = ColorToHex(c),
++                () => _flow.OutlineColor = ColorToHex(c)),
++            Colors.Transparent);
++    }
++
++    // 선택 구간이 있으면 그 구간의 런에 set을 적용하고, 없으면 문서 기본값(setDefault)을 바꾼다. 이후 재분할.
++    private void ApplyFlowSelectionStyle(System.Action<FlowTextRun> set, System.Action setDefault)
++    {
++        if (FlowTextBox != null && FlowTextBox.SelectionLength > 0)
++        {
++            EnsureRuns();
++            var start = FlowTextBox.SelectionStart;
++            var len = FlowTextBox.SelectionLength;
++            _flow.Runs = ApplyStyleToRange(_flow.Runs, start, start + len, set);
++            _flow.Text = RunsText(_flow.Runs);
++            _historyDirty = true;
++            RebuildFlowDocument();
++            FlowTextBox.Focus();
++            FlowTextBox.Select(start, len); // 선택을 유지해 연이어 다른 서식을 적용할 수 있게.
++        }
++        else
++        {
++            setDefault();
++            _historyDirty = true;
++            RebuildFlowDocument();
++        }
++    }
++
++    private void FlowBackdropColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (!_flowReady)
++        {
++            return;
++        }
++        OnColorComboChanged(FlowBackdropColorComboBox, true,
++            () => SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor),
++            c => { _flow.BackdropColor = ColorToHex(c); _historyDirty = true; ApplyBackdrop(); },
++            Colors.White);
++    }
++
++    // 본문이 모두 보이도록 페이지 수를 분할 결과(PageCount)에 맞춘다. 부족하면 빈 페이지 추가, 남으면 뒤에서 삭제.
++    private void FitPagesToFlowText_Click(object sender, RoutedEventArgs e)
++    {
++        SaveCurrentPageState();
++
++        if (string.IsNullOrEmpty(_flow.Text) || _flowPaginator == null)
++        {
++            UpdateStatus("본문 텍스트가 없습니다.");
++            return;
++        }
++
++        int required;
++        try
++        {
++            if (!_flowPaginator.IsPageCountValid)
++            {
++                _flowPaginator.ComputePageCount(); // 전체 분할(필요 페이지 수 산출).
++            }
++            required = System.Math.Max(1, _flowPaginator.PageCount);
++        }
++        catch
++        {
++            UpdateStatus("텍스트 분량을 계산할 수 없습니다.");
++            return;
++        }
++
++        if (required == _pages.Count)
++        {
++            UpdateStatus($"이미 텍스트 분량에 맞는 {required}개 페이지입니다.");
++            return;
++        }
++
++        if (required < _pages.Count)
++        {
++            // 줄이기: 뒤쪽 페이지를 삭제한다. 삭제 대상에 칸/내용이 있으면 한 번 확인한다(데이터 손실 방지).
++            var removeCount = _pages.Count - required;
++            var hasContent = false;
++            for (var i = required; i < _pages.Count; i++)
++            {
++                if (_pages[i].Panels.Count > 0)
++                {
++                    hasContent = true;
++                    break;
++                }
++            }
++
++            if (hasContent &&
++                MessageBox.Show(this,
++                    $"텍스트 분량에 맞추려면 뒤쪽 페이지 {removeCount}개를 삭제해야 합니다.\n그중 일부에는 칸/내용이 있습니다. 계속할까요?",
++                    "텍스트 길이에 맞춰 페이지 생성", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
++            {
++                return;
++            }
++
++            _historyStructuralPending = true; // 페이지 구조 변경: 다음 캡처에서 전체 재직렬화.
++            for (var i = _pages.Count - 1; i >= required; i--)
++            {
++                _pages.RemoveAt(i);
++            }
++        }
++        else
++        {
++            // 늘리기: 새 페이지는 현재 페이지의 크기·배경색·칸(수·모양·색)만 복제하고,
++            // 칸 안의 내용(이미지·말풍선)은 비운다. JSON 왕복으로 깊은 복사해 페이지끼리 데이터를 공유하지 않게 한다.
++            _historyStructuralPending = true;
++            var templateJson = JsonSerializer.Serialize(_pages[_currentPageIndex]);
++            while (_pages.Count < required)
++            {
++                var clone = JsonSerializer.Deserialize<ComicPageData>(templateJson)!;
++                clone.Name = $"Page {_pages.Count + 1}";
++                foreach (var panel in clone.Panels)
++                {
++                    panel.Images.Clear();  // 칸 모양만 복제 — 내용물(이미지)은 제외.
++                    panel.Bubbles.Clear(); // 칸 모양만 복제 — 내용물(말풍선)은 제외.
++                }
++                _pages.Add(clone);
++            }
++        }
++
++        _currentPageIndex = System.Math.Clamp(_currentPageIndex, 0, _pages.Count - 1);
++        LoadPage(_pages[_currentPageIndex]);
++        ClearSelection();
++        UpdatePageList();
++        UpdateStatus($"텍스트 분량에 맞춰 페이지를 {required}개로 맞췄습니다.");
++    }
++
++    // 분할된 페이지 Visual에 아웃라인을 입혀 다시 그린다. 글리프를 채움색별로 묶어 구간별 색·아웃라인을 보존한다.
++    // 모든 아웃라인이 투명이면 네이티브 Visual을 그대로 쓴다(per-run 채움색은 이미 정확).
++    private Visual BuildFlowPageVisual(Visual pageVisual)
++    {
++        if (!_flowNeedOutline)
++        {
++            return pageVisual; // 불투명 아웃라인 없음 → 네이티브 글리프(구간별 채움색 그대로).
++        }
++
++        var byColor = new System.Collections.Generic.Dictionary<Color, GeometryGroup>();
++        CollectGlyphGeometry(pageVisual, pageVisual, byColor);
++        if (byColor.Count == 0)
++        {
++            return pageVisual;
++        }
++
++        var penWidth = System.Math.Max(3, (_flow.FontSize > 0 ? _flow.FontSize : 20) / 3.5);
++        var defFill = SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color);
++        var defOutline = SafeColor(string.IsNullOrEmpty(_flow.OutlineColor) ? "#00FFFFFF" : _flow.OutlineColor);
++
++        var dv = new DrawingVisual();
++        using (var dc = dv.RenderOpen())
++        {
++            // 1패스: 외곽선(모든 글자 뒤로 깔리도록 먼저). 그룹 키색 → 실제 (채움,아웃라인) 매핑 사용.
++            foreach (var kv in byColor)
++            {
++                var outline = _flowRenderMap.TryGetValue(kv.Key, out var pair) ? pair.Outline : defOutline;
++                if (outline.A == 0)
++                {
++                    continue;
++                }
++                var pen = new Pen(new SolidColorBrush(outline), penWidth) { LineJoin = PenLineJoin.Round, MiterLimit = 2 };
++                dc.DrawGeometry(null, pen, kv.Value);
++            }
++            // 2패스: 채움(각 구간의 실제 채움색).
++            foreach (var kv in byColor)
++            {
++                var fill = _flowRenderMap.TryGetValue(kv.Key, out var pair) ? pair.Fill : defFill;
++                dc.DrawGeometry(new SolidColorBrush(fill), null, kv.Value);
++            }
++        }
++        return dv;
++    }
++
++    // (채움,아웃라인) 조합마다 고유 키색을 반환한다(같은 조합은 재사용해 한 그룹으로 묶임). 키색은 그리지 않고 그룹 식별용.
++    private Color FlowRenderKey(Color fill, Color outline, System.Collections.Generic.Dictionary<(Color, Color), Color> pairKeys, ref int seq)
++    {
++        var pk = (fill, outline);
++        if (pairKeys.TryGetValue(pk, out var existing))
++        {
++            return existing;
++        }
++        var key = Color.FromArgb(255, (byte)(seq >> 16), (byte)(seq >> 8), (byte)seq);
++        seq++;
++        pairKeys[pk] = key;
++        _flowRenderMap[key] = (fill, outline);
++        return key;
++    }
++
++    // 페이지 Visual 트리를 훑어 글리프 지오메트리를 '채움색별 그룹'으로 모은다(루트 좌표 기준).
++    private void CollectGlyphGeometry(Visual root, Visual v, System.Collections.Generic.Dictionary<Color, GeometryGroup> acc)
++    {
++        var drawing = VisualTreeHelper.GetDrawing(v);
++        if (drawing != null)
++        {
++            var m = ReferenceEquals(v, root) ? Matrix.Identity : AffineToAncestor(v, root);
++            CollectGlyphFromDrawing(drawing, m, acc);
++        }
++
++        var n = VisualTreeHelper.GetChildrenCount(v);
++        for (var i = 0; i < n; i++)
++        {
++            if (VisualTreeHelper.GetChild(v, i) is Visual child)
++            {
++                CollectGlyphGeometry(root, child, acc);
++            }
++        }
++    }
++
++    private void CollectGlyphFromDrawing(Drawing d, Matrix m, System.Collections.Generic.Dictionary<Color, GeometryGroup> acc)
++    {
++        switch (d)
++        {
++            case DrawingGroup dg:
++                var gm = m;
++                if (dg.Transform != null && !dg.Transform.Value.IsIdentity)
++                {
++                    gm = dg.Transform.Value * m;
++                }
++                foreach (var child in dg.Children)
++                {
++                    CollectGlyphFromDrawing(child, gm, acc);
++                }
++                break;
++
++            case GlyphRunDrawing grd when grd.GlyphRun != null:
++                var geo = grd.GlyphRun.BuildGeometry();
++                if (geo != null && !geo.IsEmpty())
++                {
++                    if (!m.IsIdentity)
++                    {
++                        geo.Transform = new MatrixTransform(m);
++                    }
++                    var color = (grd.ForegroundBrush as SolidColorBrush)?.Color
++                                ?? SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color);
++                    if (!acc.TryGetValue(color, out var grp))
++                    {
++                        grp = new GeometryGroup { FillRule = FillRule.Nonzero };
++                        acc[color] = grp;
++                    }
++                    grp.Children.Add(geo);
++                }
++                break;
++        }
++    }
++
++    // 비주얼의 로컬 좌표 → 조상 좌표로 가는 아핀 행렬을 복원한다(세 점 변환에서 역산).
++    private static Matrix AffineToAncestor(Visual v, Visual ancestor)
++    {
++        var tx = v.TransformToAncestor(ancestor);
++        var p0 = tx.Transform(new Point(0, 0));
++        var px = tx.Transform(new Point(1, 0));
++        var py = tx.Transform(new Point(0, 1));
++        return new Matrix(px.X - p0.X, px.Y - p0.Y, py.X - p0.X, py.Y - p0.Y, p0.X, p0.Y);
++    }
++
++    // --- 구간(런) 스팬 유틸 ---
++
++    // 런이 없으면 Text로부터 만든다(구간 서식 적용 직전 보장).
++    private void EnsureRuns()
++    {
++        if (_flow.Runs.Count == 0 && !string.IsNullOrEmpty(_flow.Text))
++        {
++            _flow.Runs = MakeDefaultRuns(_flow.Text);
++        }
++    }
++
++    private static System.Collections.Generic.List<FlowTextRun> MakeDefaultRuns(string text)
++        => string.IsNullOrEmpty(text)
++            ? new System.Collections.Generic.List<FlowTextRun>()
++            : new System.Collections.Generic.List<FlowTextRun> { new FlowTextRun { Text = text } };
++
++    private static string RunsText(System.Collections.Generic.List<FlowTextRun> runs)
++        => string.Concat(runs.Select(r => r.Text));
++
++    private static bool SameFlowStyle(FlowTextRun a, FlowTextRun b)
++        => (a.FontFamily ?? "") == (b.FontFamily ?? "")
++           && (a.Color ?? "") == (b.Color ?? "")
++           && (a.OutlineColor ?? "") == (b.OutlineColor ?? "");
++
++    // 인접한 동일 서식 런을 합치고 빈 런을 제거한다.
++    private static System.Collections.Generic.List<FlowTextRun> CoalesceRuns(System.Collections.Generic.List<FlowTextRun> runs)
++    {
++        var result = new System.Collections.Generic.List<FlowTextRun>();
++        foreach (var r in runs)
++        {
++            if (r.Text.Length == 0)
++            {
++                continue;
++            }
++            if (result.Count > 0 && SameFlowStyle(result[^1], r))
++            {
++                result[^1].Text += r.Text;
++            }
++            else
++            {
++                result.Add(r.Clone());
++            }
++        }
++        return result;
++    }
++
++    // runs에서 문자 구간 [from,to)를 잘라 새 런 리스트로 반환(서식 유지).
++    private static System.Collections.Generic.List<FlowTextRun> SliceRuns(System.Collections.Generic.List<FlowTextRun> runs, int from, int to)
++    {
++        var result = new System.Collections.Generic.List<FlowTextRun>();
++        if (to <= from)
++        {
++            return result;
++        }
++        var pos = 0;
++        foreach (var r in runs)
++        {
++            var rStart = pos;
++            var rEnd = pos + r.Text.Length;
++            pos = rEnd;
++            var a = System.Math.Max(from, rStart);
++            var b = System.Math.Min(to, rEnd);
++            if (b <= a)
++            {
++                continue;
++            }
++            var piece = r.Clone();
++            piece.Text = r.Text.Substring(a - rStart, b - a);
++            result.Add(piece);
++        }
++        return result;
++    }
++
++    // 문자 index 위치의 런(상속 서식 판단용). 없으면 마지막/기본.
++    private static FlowTextRun StyleAt(System.Collections.Generic.List<FlowTextRun> runs, int index)
++    {
++        var pos = 0;
++        foreach (var r in runs)
++        {
++            if (index < pos + r.Text.Length)
++            {
++                return r;
++            }
++            pos += r.Text.Length;
++        }
++        return runs.Count > 0 ? runs[^1] : new FlowTextRun();
++    }
++
++    // oldText→newText 한 구간 치환으로 보고 런을 갱신. 삽입 문자는 삽입 지점 직전 문자의 서식을 상속.
++    private static System.Collections.Generic.List<FlowTextRun> SpliceRuns(System.Collections.Generic.List<FlowTextRun> runs, string oldText, string newText)
++    {
++        if (oldText == newText)
++        {
++            return runs;
++        }
++        if (runs.Count == 0)
++        {
++            return MakeDefaultRuns(newText);
++        }
++
++        int oldLen = oldText.Length, newLen = newText.Length;
++        var p = 0;
++        while (p < oldLen && p < newLen && oldText[p] == newText[p])
++        {
++            p++;
++        }
++        var s = 0;
++        while (s < oldLen - p && s < newLen - p && oldText[oldLen - 1 - s] == newText[newLen - 1 - s])
++        {
++            s++;
++        }
++
++        var oldEnd = oldLen - s;
++        var ins = newText.Substring(p, newLen - s - p);
++
++        var before = SliceRuns(runs, 0, p);
++        var after = SliceRuns(runs, oldEnd, oldLen);
++
++        var combined = new System.Collections.Generic.List<FlowTextRun>();
++        combined.AddRange(before);
++        if (ins.Length > 0)
++        {
++            var src = p > 0 ? StyleAt(runs, p - 1) : (runs.Count > 0 ? runs[0] : new FlowTextRun());
++            combined.Add(new FlowTextRun { Text = ins, FontFamily = src.FontFamily, Color = src.Color, OutlineColor = src.OutlineColor });
++        }
++        combined.AddRange(after);
++        return CoalesceRuns(combined);
++    }
++
++    // [from,to) 구간 런에 set을 적용한다(경계에서 분할 후 적용, 다시 합침).
++    private static System.Collections.Generic.List<FlowTextRun> ApplyStyleToRange(System.Collections.Generic.List<FlowTextRun> runs, int from, int to, System.Action<FlowTextRun> set)
++    {
++        var total = RunsText(runs).Length;
++        from = System.Math.Clamp(from, 0, total);
++        to = System.Math.Clamp(to, 0, total);
++        if (to <= from)
++        {
++            return runs;
++        }
++        var before = SliceRuns(runs, 0, from);
++        var middle = SliceRuns(runs, from, to);
++        var after = SliceRuns(runs, to, total);
++        foreach (var r in middle)
++        {
++            set(r);
++        }
++        var combined = new System.Collections.Generic.List<FlowTextRun>();
++        combined.AddRange(before);
++        combined.AddRange(middle);
++        combined.AddRange(after);
++        return CoalesceRuns(combined);
++    }
++}
+diff --git a/src/MainWindow/MainWindow.Inspector.cs b/src/MainWindow/MainWindow.Inspector.cs
+index 9ff0804..d466758 100644
+--- a/src/MainWindow/MainWindow.Inspector.cs
++++ b/src/MainWindow/MainWindow.Inspector.cs
+@@ -414,10 +414,59 @@ public partial class MainWindow : Window
+ 
+         if (BubbleFontFamilyComboBox.SelectedItem is ComboBoxItem item && item.Tag is string family)
+         {
+-            _selectedBubble.TextBlock.FontFamily = new FontFamily(family);
+             _lastBubbleFontFamily = family; // 새 말풍선에 이어서 적용.
+-            UpdateBubbleGeometry(_selectedBubble);
++            // 선택 구간이 있으면 그 구간만, 없으면 말풍선 전체 글꼴.
++            ApplyBubbleRunStyle(
++                r => r.FontFamily = family,
++                () => _selectedBubble!.TextBlock.FontFamily = new FontFamily(family));
++        }
++    }
++
++    private void BubbleAlignmentComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (_isLoadingInspector || _selectedBubble == null)
++        {
++            return;
++        }
++
++        var align = (BubbleAlignmentComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Center";
++        _selectedBubble.TextBlock.TextAlignment = ParseFlowAlignment(align);
++        _historyDirty = true;
++        UpdateBubbleGeometry(_selectedBubble);
++    }
++
++    private void BubbleVAlignComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (_isLoadingInspector || _selectedBubble == null)
++        {
++            return;
++        }
++
++        var v = (BubbleVAlignComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Center";
++        _selectedBubble.TextBlock.VerticalAlignment = ParseVerticalAlignment(v);
++        _historyDirty = true;
++        UpdateBubbleGeometry(_selectedBubble);
++    }
++
++    private static VerticalAlignment ParseVerticalAlignment(string v) => v switch
++    {
++        "Top" => VerticalAlignment.Top,
++        "Bottom" => VerticalAlignment.Bottom,
++        _ => VerticalAlignment.Center
++    };
++
++    private void BubbleWarpCheckBox_Changed(object sender, RoutedEventArgs e)
++    {
++        if (_isLoadingInspector || _selectedBubble == null)
++        {
++            return;
+         }
++
++        _selectedBubble.WarpShape = BubbleWarpShapeCheckBox.IsChecked == true;
++        _selectedBubble.WarpText = BubbleWarpTextCheckBox.IsChecked == true;
++        _historyDirty = true;
++        UpdateBubbleGeometry(_selectedBubble); // 도형/글자 워프 적용·해제.
++        PositionSelectedTailHandles();         // 모서리 핸들 표시/숨김 갱신.
+     }
+ 
+     // 글자 크기 입력칸의 현재 값(없거나 잘못되면 18). 6~300으로 제한.
+@@ -438,6 +487,18 @@ public partial class MainWindow : Window
+         }
+     }
+ 
++    private void BubbleLineHeightBox_TextChanged(object sender, TextChangedEventArgs e)
++    {
++        if (_isLoadingInspector || _selectedBubble == null)
++        {
++            return;
++        }
++
++        _selectedBubble.TextBlock.LineHeight = Math.Max(0, ParseDoubleOr(BubbleLineHeightBox.Text, 0));
++        _historyDirty = true;
++        UpdateBubbleGeometry(_selectedBubble); // autofit 재계산 + 재렌더.
++    }
++
+     private void BubbleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+     {
+         if (_selectedBubble != null && !_isLoadingInspector)
+@@ -555,12 +616,14 @@ public partial class MainWindow : Window
+     {
+         OnBubbleColorComboChanged(BubbleFillColorComboBox,
+             () => (_selectedBubble!.TextBlock.Fill as SolidColorBrush)?.Color ?? Colors.Black,
+-            c =>
+-            {
+-                _selectedBubble!.TextBlock.Fill = new SolidColorBrush(c);
+-                // 집중선/효과선은 선 색이 글자색을 따르므로 즉시 갱신한다.
+-                UpdateBubbleShapePath(_selectedBubble);
+-            },
++            c => ApplyBubbleRunStyle(
++                r => r.Color = ColorToHex(c),
++                () =>
++                {
++                    _selectedBubble!.TextBlock.Fill = new SolidColorBrush(c);
++                    // 집중선/효과선은 선 색이 글자색을 따르므로 즉시 갱신한다.
++                    UpdateBubbleShapePath(_selectedBubble);
++                }),
+             Colors.Black);
+     }
+ 
+@@ -568,7 +631,9 @@ public partial class MainWindow : Window
+     {
+         OnBubbleColorComboChanged(BubbleStrokeColorComboBox,
+             () => (_selectedBubble!.TextBlock.Stroke as SolidColorBrush)?.Color ?? Colors.Transparent,
+-            c => _selectedBubble!.TextBlock.Stroke = new SolidColorBrush(c),
++            c => ApplyBubbleRunStyle(
++                r => r.OutlineColor = ColorToHex(c),
++                () => _selectedBubble!.TextBlock.Stroke = new SolidColorBrush(c)),
+             Colors.Transparent);
+     }
+ 
+@@ -752,6 +817,13 @@ public partial class MainWindow : Window
+         SetShapeOptionVisible(BubbleShapeCountText, BubbleShapeCountSlider, hasCountAndIrregularity);
+         SetShapeOptionVisible(BubbleShapeIrregularityText, BubbleShapeIrregularitySlider, hasCountAndIrregularity);
+         SetShapeOptionVisible(BubbleShapeWidthVarText, BubbleShapeWidthVarSlider, hasWidthVar);
++
++        // 꼬리는 본체가 있는 모양(원형/사각·구름폭발·플래시)에만 의미가 있다. 집중선·속도선·테두리 없음은 꼬리 섹션을 숨긴다.
++        var hasTail = shape is BubbleShape.RoundRect or BubbleShape.CloudExplosion or BubbleShape.Flash;
++        if (BubbleTailSectionBorder != null)
++        {
++            BubbleTailSectionBorder.Visibility = hasTail ? Visibility.Visible : Visibility.Collapsed;
++        }
+     }
+ 
+     // 강도 슬라이더의 모양별 표시 이름(속도선은 방향이라 '회전').
+@@ -855,9 +927,42 @@ public partial class MainWindow : Window
+             return;
+         }
+ 
+-        _selectedBubble.TextBlock.Text = SelectedBubbleTextBox.Text;
++        var tb = _selectedBubble.TextBlock;
++        var oldText = tb.Text ?? string.Empty;
++        // 편집을 '한 구간 치환'으로 보고 구간 서식을 보존한다(본문 텍스트와 동일 로직 재사용).
++        tb.StyledRuns = SpliceRuns(tb.StyledRuns ?? MakeDefaultRuns(oldText), oldText, SelectedBubbleTextBox.Text);
++        tb.Text = SelectedBubbleTextBox.Text;
++        _historyDirty = true;
+         // 텍스트가 길어지면 말풍선에 맞춰 글자 크기를 자동 축소한다.
+         ApplyBubbleAutoFit(_selectedBubble);
+     }
+ 
++    // 선택 구간이 있으면 그 구간의 런에 set을 적용하고, 없으면 말풍선 전체 기본값(setBase)을 바꾼다.
++    private void ApplyBubbleRunStyle(System.Action<FlowTextRun> set, System.Action setBase)
++    {
++        if (_selectedBubble == null)
++        {
++            return;
++        }
++
++        var tb = _selectedBubble.TextBlock;
++        if (SelectedBubbleTextBox != null && SelectedBubbleTextBox.SelectionLength > 0)
++        {
++            var runs = tb.StyledRuns is { Count: > 0 } ? tb.StyledRuns : MakeDefaultRuns(tb.Text);
++            var start = SelectedBubbleTextBox.SelectionStart;
++            var len = SelectedBubbleTextBox.SelectionLength;
++            tb.StyledRuns = ApplyStyleToRange(runs, start, start + len, set);
++            _historyDirty = true;
++            UpdateBubbleGeometry(_selectedBubble);
++            SelectedBubbleTextBox.Focus();
++            SelectedBubbleTextBox.Select(start, len); // 선택 유지(연이어 다른 서식 적용 가능).
++        }
++        else
++        {
++            setBase();
++            _historyDirty = true;
++            UpdateBubbleGeometry(_selectedBubble);
++        }
++    }
++
+ }
+diff --git a/src/MainWindow/MainWindow.Interaction.cs b/src/MainWindow/MainWindow.Interaction.cs
+index c3c1188..08cae04 100644
+--- a/src/MainWindow/MainWindow.Interaction.cs
++++ b/src/MainWindow/MainWindow.Interaction.cs
+@@ -237,9 +237,11 @@ public partial class MainWindow : Window
+             case ComicPanel p:
+                 if (!(_selectionKind == SelectionKind.Panel && p == _selectedPanel))
+                 {
++                    // 호버 해제 시 칸의 실제 테두리색으로 복원한다(검정으로 고정하면 커스텀 색이 지워짐).
++                    var borderBrush = new SolidColorBrush(p.BorderColor);
+                     foreach (var line in p.QuadBorderLines)
+                     {
+-                        line.Stroke = Brushes.Black;
++                        line.Stroke = borderBrush;
+                     }
+                 }
+                 break;
+@@ -756,8 +758,21 @@ public partial class MainWindow : Window
+ 
+         var canvas = (Canvas)bubble.Container.Parent;
+         var position = e.GetPosition(canvas);
+-        Canvas.SetLeft(bubble.Container, position.X - _dragStart.X);
+-        Canvas.SetTop(bubble.Container, position.Y - _dragStart.Y);
++        var x = position.X - _dragStart.X;
++        var y = position.Y - _dragStart.Y;
++
++        // 소유 칸의 변·중앙에 스냅(Alt로 일시 해제).
++        if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0)
++        {
++            (x, y) = SnapBubblePosition(bubble, x, y);
++        }
++        else
++        {
++            ClearSnapGuides();
++        }
++
++        Canvas.SetLeft(bubble.Container, x);
++        Canvas.SetTop(bubble.Container, y);
+ 
+         var relative = GetBubblePositionInOwnerPanel(bubble);
+         _isLoadingInspector = true;
+@@ -991,6 +1006,7 @@ public partial class MainWindow : Window
+     private void EndBubbleDrag(SpeechBubble bubble)
+     {
+         _isDraggingBubble = false;
++        ClearSnapGuides(); // 드래그 끝나면 스냅 가이드 선 숨김.
+ 
+         if (bubble.Container.IsMouseCaptured)
+         {
+diff --git a/src/MainWindow/MainWindow.Pages.cs b/src/MainWindow/MainWindow.Pages.cs
+index 992b24b..d8b6ff3 100644
+--- a/src/MainWindow/MainWindow.Pages.cs
++++ b/src/MainWindow/MainWindow.Pages.cs
+@@ -145,6 +145,10 @@ public partial class MainWindow : Window
+             Height = bubble.Container.Height,
+             FontSize = bubble.MaxFontSize,
+             FontFamily = bubble.TextBlock.FontFamily?.Source ?? string.Empty,
++            TextAlignment = bubble.TextBlock.TextAlignment.ToString(),
++            VerticalAlignment = bubble.TextBlock.VerticalAlignment.ToString(),
++            Runs = (bubble.TextBlock.StyledRuns ?? new System.Collections.Generic.List<FlowTextRun>()).Select(r => r.Clone()).ToList(),
++            LineHeight = bubble.TextBlock.LineHeight,
+             TextMarginLeft = bubble.TextBlock.Margin.Left,
+             TextMarginTop = bubble.TextBlock.Margin.Top,
+             TextMarginRight = bubble.TextBlock.Margin.Right,
+@@ -162,6 +166,9 @@ public partial class MainWindow : Window
+             ShapeStrength = bubble.ShapeStrength,
+             ShapeIrregularity = bubble.ShapeIrregularity,
+             ShapeWidthVariation = bubble.ShapeWidthVariation,
++            CornerOffsets = PanelOffsetsToArray(bubble.CornerOffsets),
++            WarpShape = bubble.WarpShape,
++            WarpText = bubble.WarpText,
+             PivotX = bubble.PivotX,
+             PivotY = bubble.PivotY,
+             Tails = bubble.Tails
+@@ -238,7 +245,14 @@ public partial class MainWindow : Window
+     // 저장·자동저장·실행취소가 모두 이 한 곳을 거쳐 동일한 직렬화 형식을 보장한다.
+     private ComicPageData CopyPageForStorage(ComicPageData page, string? projectDirectory)
+     {
+-        var copiedPage = new ComicPageData { Name = page.Name, PageWidth = page.PageWidth, PageHeight = page.PageHeight };
++        var copiedPage = new ComicPageData
++        {
++            Name = page.Name,
++            PageWidth = page.PageWidth,
++            PageHeight = page.PageHeight,
++            BackgroundColor = page.BackgroundColor,
++            BlackBackground = page.BlackBackground
++        };
+ 
+         foreach (var panel in page.Panels)
+         {
+@@ -253,6 +267,8 @@ public partial class MainWindow : Window
+                 Height = panel.Height,
+                 IsLocked = panel.IsLocked,
+                 CornerMode = panel.CornerMode,
++                BackgroundColor = panel.BackgroundColor,
++                BorderColor = panel.BorderColor,
+                 CornerOffsets = (double[])panel.CornerOffsets.Clone(),
+                 Bubbles = panel.Bubbles
+             };
+@@ -316,6 +332,8 @@ public partial class MainWindow : Window
+         Dispatcher.BeginInvoke(new Action(CullOffscreenPanels), System.Windows.Threading.DispatcherPriority.Loaded);
+         // 인접 페이지(다음·이전) 정지 이미지를 백그라운드로 미리 디코드해 캐시를 데운다(이전 예열은 취소).
+         BeginPrefetchAdjacentPages();
++        // 본문 텍스트(노벨 뷰어): 이 페이지 인덱스에 해당하는 분량 표시.
++        UpdateFlowTextLayer();
+     }
+ 
+     // --- DTO로부터 런타임 오브젝트 생성(불러오기·붙여넣기 공용) ---
+@@ -366,8 +384,16 @@ public partial class MainWindow : Window
+         if (!string.IsNullOrEmpty(bubbleData.Id)) bubble.Id = bubbleData.Id; // 저장/실행취소 ID 유지(붙여넣기는 새 ID).
+         // 글꼴 복원(구버전/미지정이면 기존 기본 글꼴).
+         bubble.TextBlock.FontFamily = new FontFamily(string.IsNullOrEmpty(bubbleData.FontFamily) ? "Malgun Gothic" : bubbleData.FontFamily);
++        // 텍스트 정렬 복원(구버전/미지정이면 가운데).
++        bubble.TextBlock.TextAlignment = ParseFlowAlignment(string.IsNullOrEmpty(bubbleData.TextAlignment) ? "Center" : bubbleData.TextAlignment);
++        bubble.TextBlock.VerticalAlignment = ParseVerticalAlignment(string.IsNullOrEmpty(bubbleData.VerticalAlignment) ? "Center" : bubbleData.VerticalAlignment);
++        // 구간별 서식 복원(구버전/미지정이면 Text 한 덩어리로 마이그레이션). 측정·렌더가 이를 쓰므로 먼저 설정.
++        bubble.TextBlock.StyledRuns = bubbleData.Runs is { Count: > 0 }
++            ? bubbleData.Runs.Select(r => r.Clone()).ToList()
++            : MakeDefaultRuns(bubbleData.Text);
+         bubble.BorderColor = SafeColor(string.IsNullOrEmpty(bubbleData.BorderColor) ? "#000000" : bubbleData.BorderColor);
+         bubble.TextBlock.Margin = new Thickness(bubbleData.TextMarginLeft, bubbleData.TextMarginTop, bubbleData.TextMarginRight, bubbleData.TextMarginBottom);
++        bubble.TextBlock.LineHeight = bubbleData.LineHeight;
+ 
+         var (mappedShape, legacyStrength) = MapShape(bubbleData.Shape);
+         bubble.Shape = mappedShape;
+@@ -376,6 +402,9 @@ public partial class MainWindow : Window
+         // 0/미지정(구버전)이면 기존 기본 흔들림 50으로 본다.
+         bubble.ShapeIrregularity = bubbleData.ShapeIrregularity <= 0 ? 50 : bubbleData.ShapeIrregularity;
+         bubble.ShapeWidthVariation = bubbleData.ShapeWidthVariation;
++        ApplyArrayToPanelOffsets(bubbleData.CornerOffsets, bubble.CornerOffsets);
++        bubble.WarpShape = bubbleData.WarpShape;
++        bubble.WarpText = bubbleData.WarpText;
+         bubble.PivotX = bubbleData.PivotX;
+         bubble.PivotY = bubbleData.PivotY;
+         bubble.Tails.Clear();
+diff --git a/src/MainWindow/MainWindow.Persistence.cs b/src/MainWindow/MainWindow.Persistence.cs
+index 681f93f..9d271af 100644
+--- a/src/MainWindow/MainWindow.Persistence.cs
++++ b/src/MainWindow/MainWindow.Persistence.cs
+@@ -749,6 +749,17 @@ public partial class MainWindow : Window
+         var visual = new DrawingVisual();
+         using (var context = visual.RenderOpen())
+         {
++            // 텍스트 모드의 '뒷배경색'을 페이지보다 먼저(맨 뒤) 깐다. 페이지 배경이 불투명하면 그 위가 덮여 안 보이고,
++            // 페이지 배경이 투명이면 이 색이 그대로 보인다('없음'(알파 0)이면 투명 유지).
++            if (_flow.Enabled)
++            {
++                var backdrop = SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor);
++                if (backdrop.A > 0)
++                {
++                    context.DrawRectangle(new SolidColorBrush(backdrop), null, pageRect);
++                }
++            }
++
+             // 배경을 직접 그린다(페이지별 색). PageSurface는 PageFrame 테두리(1px)만큼 오프셋이 있어
+             // VisualBrush로 쓰면 좌/상에 1px 투명 여백이 생기므로, 그리드 원점(0,0)에 있는 PanelCanvas를 렌더한다.
+             // 배경색이 투명(알파 0)이면 칠해도 아무 효과가 없어 그 영역이 투명으로 남는다(= 투명 내보내기).
+@@ -763,6 +774,19 @@ public partial class MainWindow : Window
+                 Stretch = Stretch.Fill
+             };
+             context.DrawRectangle(brush, null, pageRect);
++
++            // 본문 텍스트(노벨 뷰어) — 칸·이미지 위에 얹힌다. 현재 페이지 분량만큼만 보이므로 그대로 렌더한다.
++            if (FlowTextLayer != null)
++            {
++                FlowTextLayer.UpdateLayout();
++                var flowBrush = new VisualBrush(FlowTextLayer)
++                {
++                    ViewboxUnits = BrushMappingMode.Absolute,
++                    Viewbox = pageRect,
++                    Stretch = Stretch.Fill
++                };
++                context.DrawRectangle(flowBrush, null, pageRect);
++            }
+         }
+ 
+         // 논리 페이지 좌표를 '실제 출력 버퍼 크기'로 확대 → 벡터·이미지가 더 높은 해상도로 재래스터화(슈퍼샘플링).
+@@ -1036,7 +1060,8 @@ public partial class MainWindow : Window
+             AutoMargin = ParseDoubleOr(AutoMarginTextBox.Text, 24),
+             AutoGutter = ParseDoubleOr(AutoGutterTextBox.Text, 14),
+             CurrentPageIndex = _currentPageIndex,
+-            Pages = CaptureProjectPages(Path.GetDirectoryName(fileName))
++            Pages = CaptureProjectPages(Path.GetDirectoryName(fileName)),
++            FlowText = _flow.Clone()
+         };
+ 
+         try
+@@ -1053,6 +1078,228 @@ public partial class MainWindow : Window
+         }
+     }
+ 
++    // 새로 만들기(Ctrl+N): 초기 페이지 크기·칸 구성·여백·간격을 정하는 대화상자를 띄운 뒤 그 설정으로 시작한다.
++    private void NewProject_Click(object sender, RoutedEventArgs e)
++    {
++        if (!ShowNewProjectDialog(out var pageW, out var pageH, out var pattern, out var margin, out var gutter))
++        {
++            return; // 취소.
++        }
++
++        ClearSelection();
++        ComicTitleTextBox.Text = string.Empty;
++        _projectFilePath = null;
++        _projectBaseDirectory = null;
++
++        // 선택한 칸 구성 / 여백 / 간격을 입력칸에도 반영(이후 '칸 구성 적용' 등과 일관).
++        LayoutPatternTextBox.Text = pattern;
++        AutoMarginTextBox.Text = $"{margin:0.##}";
++        AutoGutterTextBox.Text = $"{gutter:0.##}";
++
++        // 선택한 크기의 빈 페이지 하나(기본 흰색 배경)로 교체 후 로드하고, 칸 구성을 채운다.
++        ReplacePages(new[] { new ComicPageData { Name = "Page 1", PageWidth = pageW, PageHeight = pageH } });
++        _currentPageIndex = 0;
++        LoadPage(_pages[0]);
++        ApplyFlowText(null); // 본문 텍스트 초기화(빈 본문 + 기본 서식).
++        CreateLayoutFromPattern(pattern);
++        ClearSelection();
++        UpdatePageList();
++
++        ResetHistoryBaseline();
++        _undoStack.Clear();
++        _redoStack.Clear();
++        UpdateUndoRedoButtons();
++        UpdateStatus("새 프로젝트를 만들었습니다.");
++    }
++
++    // 새 프로젝트 시작 설정 대화상자. 확인이면 true와 값들, 취소면 false. 기본값을 미리 채워 둔다.
++    private bool ShowNewProjectDialog(out double pageW, out double pageH, out string pattern, out double margin, out double gutter)
++    {
++        pageW = 832; pageH = 1216; pattern = "1,2,1"; margin = 24; gutter = 14;
++
++        var widthBox = NewProjectNumberBox("832");
++        var heightBox = NewProjectNumberBox("1216");
++        var marginBox = NewProjectNumberBox("24");
++        var gutterBox = NewProjectNumberBox("14");
++
++        // 칸 구성: 숫자 입력 대신 예시 그림 3개 중 선택.
++        var presets = new (string Pattern, int[] Rows, string Label)[]
++        {
++            ("1", new[] { 1 }, "1 (1칸)"),
++            ("2,2", new[] { 2, 2 }, "2,2 (4칸)"),
++            ("1,2,1", new[] { 1, 2, 1 }, "1,2,1 (4칸)")
++        };
++        var selectedPattern = "1,2,1";
++        var landscape = false;
++
++        // 방향(세로/가로)에 따라 미리보기 비율이 달라지므로 썸네일을 다시 만든다.
++        var layoutRow = new StackPanel { Orientation = Orientation.Horizontal };
++        void RebuildThumbs()
++        {
++            layoutRow.Children.Clear();
++            foreach (var p in presets)
++            {
++                var content = new StackPanel { Margin = new Thickness(2, 0, 2, 0) };
++                content.Children.Add(BuildLayoutThumbnail(p.Rows, landscape));
++                content.Children.Add(new TextBlock
++                {
++                    Text = p.Label,
++                    HorizontalAlignment = HorizontalAlignment.Center,
++                    Margin = new Thickness(0, 5, 0, 0),
++                    FontSize = 11,
++                    Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x51, 0x4A))
++                });
++                var rb = new RadioButton
++                {
++                    GroupName = "np_layout",
++                    Content = content,
++                    Tag = p.Pattern,
++                    Margin = new Thickness(6, 0, 6, 0),
++                    IsChecked = p.Pattern == selectedPattern
++                };
++                rb.Checked += (_, _) => { if (rb.Tag is string t) selectedPattern = t; };
++                layoutRow.Children.Add(rb);
++            }
++        }
++        RebuildThumbs();
++
++        // 방향: 세로(기본)/가로. 가로를 고르면 너비·높이를 맞바꾸고 미리보기 비율도 가로로 바꾼다.
++        var portraitRb = new RadioButton { Content = "세로", GroupName = "np_orient", IsChecked = true, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
++        var landscapeRb = new RadioButton { Content = "가로", GroupName = "np_orient", VerticalAlignment = VerticalAlignment.Center };
++        void SetLandscape(bool land)
++        {
++            if (land == landscape)
++            {
++                return;
++            }
++            landscape = land;
++            (widthBox.Text, heightBox.Text) = (heightBox.Text, widthBox.Text); // 너비↔높이 교환
++            RebuildThumbs();
++        }
++        portraitRb.Checked += (_, _) => SetLandscape(false);
++        landscapeRb.Checked += (_, _) => SetLandscape(true);
++        var orientRow = new StackPanel { Orientation = Orientation.Horizontal };
++        orientRow.Children.Add(portraitRb);
++        orientRow.Children.Add(landscapeRb);
++
++        var panel = new StackPanel { Margin = new Thickness(18) };
++        panel.Children.Add(NewProjectRow("페이지 크기", RowWithMultiplier(widthBox, heightBox)));
++        panel.Children.Add(NewProjectRow("방향", orientRow));
++        panel.Children.Add(NewProjectRow("칸 구성", layoutRow));
++        panel.Children.Add(NewProjectRow("여백", marginBox));
++        panel.Children.Add(NewProjectRow("간격", gutterBox));
++
++        var okBtn = new Button { Content = "만들기", MinWidth = 80, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
++        var cancelBtn = new Button { Content = "취소", MinWidth = 80, IsCancel = true };
++        var buttons = new StackPanel
++        {
++            Orientation = Orientation.Horizontal,
++            HorizontalAlignment = HorizontalAlignment.Right,
++            Margin = new Thickness(0, 16, 0, 0)
++        };
++        buttons.Children.Add(okBtn);
++        buttons.Children.Add(cancelBtn);
++        panel.Children.Add(buttons);
++
++        var dialog = new Window
++        {
++            Title = "새로 만들기",
++            SizeToContent = SizeToContent.WidthAndHeight,
++            ResizeMode = ResizeMode.NoResize,
++            WindowStartupLocation = WindowStartupLocation.CenterOwner,
++            Owner = this,
++            Background = (Brush)FindResource("WindowBackgroundBrush"),
++            Content = panel
++        };
++        okBtn.Click += (_, _) => dialog.DialogResult = true;
++
++        if (dialog.ShowDialog() != true)
++        {
++            return false;
++        }
++
++        // 입력값 파싱(잘못되면 기본값). 페이지 크기는 100~5000으로 제한.
++        pageW = Math.Clamp(ParseDoubleOr(widthBox.Text, 832), 100, 5000);
++        pageH = Math.Clamp(ParseDoubleOr(heightBox.Text, 1216), 100, 5000);
++        pattern = selectedPattern;
++        margin = Math.Max(0, ParseDoubleOr(marginBox.Text, 24));
++        gutter = Math.Max(0, ParseDoubleOr(gutterBox.Text, 14));
++        return true;
++    }
++
++    // 칸 구성 예시 미니 그림: 작은 페이지 안에 행별 칸 배치를 사각형으로 그린다. 가로면 비율을 눕힌다.
++    private static FrameworkElement BuildLayoutThumbnail(int[] rows, bool landscape)
++    {
++        var page = new Border
++        {
++            Width = landscape ? 82 : 58,
++            Height = landscape ? 58 : 82,
++            Background = Brushes.White,
++            BorderBrush = new SolidColorBrush(Color.FromRgb(0xBB, 0xB6, 0xAD)),
++            BorderThickness = new Thickness(1),
++            Padding = new Thickness(3) // 페이지 여백 시늉
++        };
++
++        var grid = new Grid();
++        for (var i = 0; i < rows.Length; i++)
++        {
++            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
++        }
++
++        for (var r = 0; r < rows.Length; r++)
++        {
++            var rowCells = new UniformGrid { Rows = 1, Columns = Math.Max(1, rows[r]) };
++            for (var c = 0; c < rows[r]; c++)
++            {
++                rowCells.Children.Add(new Border
++                {
++                    Background = new SolidColorBrush(Color.FromRgb(0x8A, 0x84, 0x79)),
++                    Margin = new Thickness(1.5),
++                    CornerRadius = new CornerRadius(1)
++                });
++            }
++
++            Grid.SetRow(rowCells, r);
++            grid.Children.Add(rowCells);
++        }
++
++        page.Child = grid;
++        return page;
++    }
++
++    private static TextBox NewProjectNumberBox(string text) => new()
++    {
++        Text = text,
++        Width = 64,
++        Padding = new Thickness(6, 2, 6, 2),
++        VerticalContentAlignment = VerticalAlignment.Center
++    };
++
++    // "라벨 + 컨트롤" 한 줄(라벨 너비 통일).
++    private static FrameworkElement NewProjectRow(string label, FrameworkElement content)
++    {
++        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
++        row.Children.Add(new TextBlock
++        {
++            Text = label,
++            Width = 72,
++            VerticalAlignment = VerticalAlignment.Center,
++            Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x51, 0x4A))
++        });
++        row.Children.Add(content);
++        return row;
++    }
++
++    // 너비 × 높이 입력을 'W × H' 형태로 묶는다.
++    private static FrameworkElement RowWithMultiplier(TextBox a, TextBox b)
++    {
++        var row = new StackPanel { Orientation = Orientation.Horizontal };
++        row.Children.Add(a);
++        row.Children.Add(new TextBlock { Text = "×", Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
++        row.Children.Add(b);
++        return row;
++    }
++
+     private void LoadProject_Click(object sender, RoutedEventArgs e)
+     {
+         var dialog = new OpenFileDialog
+@@ -1084,6 +1331,7 @@ public partial class MainWindow : Window
+             ReplacePages(project.Pages);
+             _currentPageIndex = Math.Clamp(project.CurrentPageIndex, 0, _pages.Count - 1);
+             LoadPage(_pages[_currentPageIndex]);
++            ApplyFlowText(project.FlowText); // 본문 텍스트·서식 복원(인스펙터 갱신 + 재분할).
+             UpdatePageList();
+             // 불러온 프로젝트로 히스토리 기준선을 새로 잡고 이전 기록을 비운다(프로젝트 간 실행취소 방지·재사용 정합성).
+             ResetHistoryBaseline();
+diff --git a/src/MainWindow/MainWindow.Resize.cs b/src/MainWindow/MainWindow.Resize.cs
+index a072409..b3977f9 100644
+--- a/src/MainWindow/MainWindow.Resize.cs
++++ b/src/MainWindow/MainWindow.Resize.cs
+@@ -180,6 +180,7 @@ public partial class MainWindow : Window
+                     _resizeStartAspect = h > 0 ? _selectedBubble.Container.Width / h : 1;
+                 };
+                 handle.DragDelta += (_, e) => { if (_selectedBubble != null) ResizeBubbleEdge(_selectedBubble, edge, e); };
++                handle.DragCompleted += (_, _) => ClearSnapGuides();
+                 _bubbleResizeHandles[i] = handle;
+             }
+         }
+@@ -219,6 +220,16 @@ public partial class MainWindow : Window
+         var nb = ComputeResizedBounds(rect, edge, e.HorizontalChange, e.VerticalChange,
+             BubbleWidthSlider.Minimum, BubbleHeightSlider.Minimum, ShiftHeld, _resizeStartAspect);
+ 
++        // 소유 칸의 변에 스냅(Alt로 일시 해제).
++        if ((Keyboard.Modifiers & ModifierKeys.Alt) == 0)
++        {
++            nb = SnapBubbleBounds(bubble, edge, nb, ShiftHeld);
++        }
++        else
++        {
++            ClearSnapGuides();
++        }
++
+         bubble.Container.Width = nb.Width;
+         bubble.Container.Height = nb.Height;
+         SetBubblePositionInOwnerPanel(bubble, nb.X, nb.Y);
+@@ -597,6 +608,36 @@ public partial class MainWindow : Window
+             : SnapBoundsFree(edge, b, xs, ys, MinImageSize, MinImageSize);
+     }
+ 
++    // 말풍선 리사이즈를 소유 칸의 4변에 스냅한다. 입력 bounds는 칸-로컬, 스냅·가이드는 페이지 좌표로 처리 후 되돌린다.
++    private Rect SnapBubbleBounds(SpeechBubble bubble, ResizeEdge edge, Rect bLocal, bool keepAspect)
++    {
++        if (bLocal.Width <= 0 || bLocal.Height <= 0)
++        {
++            return bLocal;
++        }
++
++        var origin = BubbleOverlayOrigin(bubble);
++        var frame = bubble.OwnerPanel.Frame;
++        var xs = new List<double> { origin.X, origin.X + frame.Width };
++        var ys = new List<double> { origin.Y, origin.Y + frame.Height };
++
++        var pageRect = new Rect(bLocal.X + origin.X, bLocal.Y + origin.Y, bLocal.Width, bLocal.Height);
++        var minW = BubbleWidthSlider.Minimum;
++        var minH = BubbleHeightSlider.Minimum;
++        var snapped = keepAspect
++            ? SnapBoundsKeepAspect(edge, pageRect, xs, ys, minW, minH)
++            : SnapBoundsFree(edge, pageRect, xs, ys, minW, minH);
++
++        return new Rect(snapped.X - origin.X, snapped.Y - origin.Y, snapped.Width, snapped.Height);
++    }
++
++    // 말풍선이 든 오버레이(칸 안)의 원점을 페이지(PageOverlay) 좌표로 환산한다(스냅 후보·가이드 좌표 변환용).
++    private Point BubbleOverlayOrigin(SpeechBubble bubble)
++    {
++        var overlay = bubble.IsCropped ? bubble.OwnerPanel.Overlay : bubble.OwnerPanel.FreeOverlay;
++        return overlay.TransformToVisual(PageOverlay).Transform(new Point(0, 0));
++    }
++
+     // Uniform으로 콘텐츠 박스(cw×ch)에 맞춰 실제 렌더되는 이미지 크기(콘텐츠 좌표, 스케일 적용 전).
+     private static (double W, double H) GetImageRenderedSize(PanelImage image)
+     {
+@@ -749,6 +790,30 @@ public partial class MainWindow : Window
+         return (x, y);
+     }
+ 
++    // 말풍선 이동 시 소유 칸의 변·중앙에 스냅한다. 입력/반환은 칸-로컬, 스냅·가이드는 페이지 좌표로 처리.
++    private (double X, double Y) SnapBubblePosition(SpeechBubble bubble, double x, double y)
++    {
++        var origin = BubbleOverlayOrigin(bubble);
++        var frame = bubble.OwnerPanel.Frame;
++        double pw = frame.Width, ph = frame.Height;
++        double w = bubble.Container.Width, h = bubble.Container.Height;
++        var xs = new List<double> { origin.X, origin.X + pw };
++        var ys = new List<double> { origin.Y, origin.Y + ph };
++
++        var px = x + origin.X;
++        var py = y + origin.Y;
++        double? gx = null, gy = null;
++
++        if (TrySnapEdgePair(px, px + w, xs, PanelSnapThreshold, out var nx, out var cx)) { px = nx; gx = cx; }
++        else if (Math.Abs(px + w / 2 - (origin.X + pw / 2)) <= PanelSnapThreshold) { px = origin.X + pw / 2 - w / 2; gx = origin.X + pw / 2; } // 가로 중앙
++
++        if (TrySnapEdgePair(py, py + h, ys, PanelSnapThreshold, out var ny, out var cy)) { py = ny; gy = cy; }
++        else if (Math.Abs(py + h / 2 - (origin.Y + ph / 2)) <= PanelSnapThreshold) { py = origin.Y + ph / 2 - h / 2; gy = origin.Y + ph / 2; } // 세로 중앙
++
++        ShowSnapGuides(gx, gy);
++        return (px - origin.X, py - origin.Y);
++    }
++
+     // start(좌/상)·end(우/하) 두 변 중 후보에 가장 가까운 쪽으로 스냅한 새 start 좌표.
+     private static bool TrySnapEdgePair(double start, double end, List<double> candidates, double threshold, out double newStart, out double guide)
+     {
+diff --git a/src/MainWindow/MainWindow.Selection.cs b/src/MainWindow/MainWindow.Selection.cs
+index 3dfc23e..ef9bd03 100644
+--- a/src/MainWindow/MainWindow.Selection.cs
++++ b/src/MainWindow/MainWindow.Selection.cs
+@@ -173,6 +173,14 @@ public partial class MainWindow : Window
+         _isLoadingInspector = true;
+         var position = GetBubblePositionInOwnerPanel(bubble);
+         SelectedBubbleTextBox.Text = bubble.TextBlock.Text;
++        // 텍스트박스가 줄바꿈을 정규화할 수 있으므로 런·Text를 보이는 텍스트에 맞춘다.
++        if ((bubble.TextBlock.Text ?? string.Empty) != SelectedBubbleTextBox.Text)
++        {
++            bubble.TextBlock.StyledRuns = SpliceRuns(
++                bubble.TextBlock.StyledRuns ?? MakeDefaultRuns(bubble.TextBlock.Text ?? string.Empty),
++                bubble.TextBlock.Text ?? string.Empty, SelectedBubbleTextBox.Text);
++            bubble.TextBlock.Text = SelectedBubbleTextBox.Text;
++        }
+         BubbleCropCheckBox.IsChecked = bubble.IsCropped;
+         BubbleLockCheckBox.IsChecked = bubble.IsLocked;
+         BubblePivotXBox.Text = $"{bubble.PivotX:0.##}";
+@@ -207,7 +215,20 @@ public partial class MainWindow : Window
+         BubbleWidthSlider.Value = bubble.Container.Width;
+         BubbleHeightSlider.Value = bubble.Container.Height;
+         BubbleFontBox.Text = $"{bubble.MaxFontSize:0}";
++        BubbleLineHeightBox.Text = $"{bubble.TextBlock.LineHeight:0.##}";
+         SelectBubbleFontInCombo(bubble.TextBlock.FontFamily?.Source ?? "Malgun Gothic");
++        var bubbleAlign = bubble.TextBlock.TextAlignment.ToString();
++        foreach (ComboBoxItem item in BubbleAlignmentComboBox.Items)
++        {
++            item.IsSelected = (item.Tag as string) == bubbleAlign;
++        }
++        var bubbleVAlign = bubble.TextBlock.VerticalAlignment.ToString();
++        foreach (ComboBoxItem item in BubbleVAlignComboBox.Items)
++        {
++            item.IsSelected = (item.Tag as string) == bubbleVAlign;
++        }
++        BubbleWarpShapeCheckBox.IsChecked = bubble.WarpShape;
++        BubbleWarpTextCheckBox.IsChecked = bubble.WarpText;
+         BubbleXSlider.Value = Math.Clamp(position.X, BubbleXSlider.Minimum, BubbleXSlider.Maximum);
+         BubbleYSlider.Value = Math.Clamp(position.Y, BubbleYSlider.Minimum, BubbleYSlider.Maximum);
+         _isLoadingInspector = false;
+@@ -346,8 +367,18 @@ public partial class MainWindow : Window
+                 break;
+             case SelectionKind.Bubble when _selectedBubble != null:
+                 _selectedBubble.TextBlock.Margin = DefaultBubbleTextMargin; // 텍스트 여백을 기본값으로.
+-                PositionTextRegionHandles();
+-                UpdateStatus("말풍선 텍스트 여백을 기본값으로 되돌렸습니다.");
++                // 변형(모서리) 리셋: 변위 0으로, 테두리·글자 워프 토글 끔.
++                for (var i = 0; i < _selectedBubble.CornerOffsets.Length; i++)
++                {
++                    _selectedBubble.CornerOffsets[i] = new Point();
++                }
++                _selectedBubble.WarpShape = false;
++                _selectedBubble.WarpText = false;
++                _historyDirty = true;
++                UpdateBubbleGeometry(_selectedBubble); // 워프 해제·텍스트 워프 파라미터 갱신.
++                LoadBubbleValues(_selectedBubble);     // 인스펙터(여백 핸들·워프 체크박스) 동기화.
++                PositionSelectedTailHandles();         // 텍스트/모서리 핸들 표시 갱신.
++                UpdateStatus("말풍선 텍스트 여백과 변형을 기본값으로 되돌렸습니다.");
+                 break;
+             default:
+                 UpdateStatus("리셋할 이미지·칸·말풍선을 먼저 선택하세요.");
+@@ -653,11 +684,11 @@ public partial class MainWindow : Window
+     {
+         foreach (var panel in _panels)
+         {
+-            // 칸 테두리(4선)는 '칸'이 활성 선택일 때만 강조한다(잠금 시 빨강). 비선택은 검정.
++            // 칸 테두리(4선)는 '칸'이 활성 선택일 때만 강조한다(잠금 시 빨강). 비선택은 칸의 실제 테두리색.
+             var isSelectedPanel = _selectionKind == SelectionKind.Panel && panel == _selectedPanel;
+             var borderBrush = isSelectedPanel
+                 ? (panel.IsLocked ? SelectionLockedBrush : SelectionAccentBrush)
+-                : Brushes.Black;
++                : new SolidColorBrush(panel.BorderColor);
+             foreach (var line in panel.QuadBorderLines)
+             {
+                 line.Stroke = borderBrush;
+diff --git a/src/MainWindow/MainWindow.Shapes.cs b/src/MainWindow/MainWindow.Shapes.cs
+index 846a769..84fc37e 100644
+--- a/src/MainWindow/MainWindow.Shapes.cs
++++ b/src/MainWindow/MainWindow.Shapes.cs
+@@ -191,14 +191,21 @@ public partial class MainWindow : Window
+         var w = bubble.Container.Width;
+         var h = bubble.Container.Height;
+         var lineColor = bubble.TextBlock.Fill;
++        var warp = bubble.WarpShape && HasCornerWarp(bubble.CornerOffsets);
++        var o = bubble.CornerOffsets;
+ 
+         foreach (var (inner, edge, fadeStart, fadeEnd) in ConcentrationLineEndpoints(w, h, bubble.ShapeCount, bubble.ShapeStrength, bubble.ShapeIrregularity))
+         {
++            // 모서리 조절(도형): 선 양 끝점을 사변형으로 워프한다(직선이라 끝점만 옮겨도 충분).
++            var a = warp ? WarpPoint(inner.X, inner.Y, w, h, o) : inner;
++            var b = warp ? WarpPoint(edge.X, edge.Y, w, h, o) : edge;
++            var fs = warp ? WarpPoint(fadeStart.X, fadeStart.Y, w, h, o) : fadeStart;
++            var fe = warp ? WarpPoint(fadeEnd.X, fadeEnd.Y, w, h, o) : fadeEnd;
+             var path = new System.Windows.Shapes.Path
+             {
+-                Data = new LineGeometry(inner, edge),
++                Data = new LineGeometry(a, b),
+                 // 중심 쪽(fadeStart 이전) 투명 → 바깥(fadeEnd 이후) 불투명.
+-                Stroke = CreateDirectionFadeBrush(lineColor, fadeStart, fadeEnd),
++                Stroke = CreateDirectionFadeBrush(lineColor, fs, fe),
+                 StrokeThickness = 1.6,
+                 IsHitTestVisible = false
+             };
+@@ -272,6 +279,8 @@ public partial class MainWindow : Window
+         var w = bubble.Container.Width;
+         var h = bubble.Container.Height;
+         var lineColor = bubble.TextBlock.Fill;
++        var warp = bubble.WarpShape && HasCornerWarp(bubble.CornerOffsets);
++        var o = bubble.CornerOffsets;
+ 
+         foreach (var (baseP, tip) in EffectLineEndpoints(w, h, bubble.ShapeCount, bubble.ShapeStrength, bubble.ShapeIrregularity))
+         {
+@@ -281,11 +290,14 @@ public partial class MainWindow : Window
+                 continue;
+             }
+ 
++            // 모서리 조절(도형): 클립된 양 끝점을 사변형으로 워프한다.
++            var a = warp ? WarpPoint(c0.X, c0.Y, w, h, o) : c0;
++            var b = warp ? WarpPoint(c1.X, c1.Y, w, h, o) : c1;
+             var path = new System.Windows.Shapes.Path
+             {
+-                Data = new LineGeometry(c0, c1),
++                Data = new LineGeometry(a, b),
+                 // 팁(c1) 투명 → 베이스(c0) 불투명. 보이는 구간 기준이라 선마다 자기 시작점부터 페이드된다.
+-                Stroke = CreateDirectionFadeBrush(lineColor, c1, c0),
++                Stroke = CreateDirectionFadeBrush(lineColor, b, a),
+                 StrokeThickness = 1.6,
+                 IsHitTestVisible = false
+             };
+diff --git a/src/MainWindow/MainWindow.Shortcuts.cs b/src/MainWindow/MainWindow.Shortcuts.cs
+index 8873128..20fd28a 100644
+--- a/src/MainWindow/MainWindow.Shortcuts.cs
++++ b/src/MainWindow/MainWindow.Shortcuts.cs
+@@ -13,6 +13,7 @@ public partial class MainWindow : Window
+     // 편집 가능한 명령 단축키 정의(액션 id, 표시명, 기본 수정자, 기본 키).
+     private static readonly (string Id, string Label, ModifierKeys Mods, Key Key)[] ShortcutDefs =
+     {
++        ("new",   "새로 만들기",     ModifierKeys.Control, Key.N),
+         ("open",  "불러오기",       ModifierKeys.Control, Key.O),
+         ("save",  "저장",           ModifierKeys.Control, Key.S),
+         ("undo",  "실행취소",       ModifierKeys.Control, Key.Z),
+@@ -22,6 +23,7 @@ public partial class MainWindow : Window
+         ("paste", "붙여넣기",       ModifierKeys.Control, Key.V),
+         ("reset", "선택 리셋",      ModifierKeys.Control, Key.R),
+         ("lock",  "선택 잠금/해제", ModifierKeys.None,    Key.L),
++        ("toggletext", "텍스트 모드", ModifierKeys.Control, Key.T),
+         ("preferences", "환경설정", ModifierKeys.Control, Key.OemComma),
+     };
+ 
+@@ -81,6 +83,7 @@ public partial class MainWindow : Window
+     {
+         switch (id)
+         {
++            case "new": NewProject_Click(this, new RoutedEventArgs()); break;
+             case "open": LoadProject_Click(this, new RoutedEventArgs()); break;
+             case "save": SaveProjectToCurrentOrPrompt(); break;
+             case "undo": Undo(); break;
+@@ -90,6 +93,7 @@ public partial class MainWindow : Window
+             case "paste": PasteClipboard(); break;
+             case "reset": ResetSelectedToDefault(); break;
+             case "lock": ToggleSelectedLock(); break;
++            case "toggletext": ToggleTextMode(); break;
+             case "preferences": ShowPreferencesDialog(); break;
+         }
+     }
+@@ -245,6 +249,7 @@ public partial class MainWindow : Window
+     // 메뉴 항목의 단축키 표기를 현재 설정으로 맞춘다.
+     private void RefreshShortcutMenuText()
+     {
++        NewMenuItem.InputGestureText = GestureText("new");
+         OpenMenuItem.InputGestureText = GestureText("open");
+         SaveMenuItem.InputGestureText = GestureText("save");
+         UndoMenuItem.InputGestureText = GestureText("undo");
+diff --git a/src/Models/Models.cs b/src/Models/Models.cs
+index bb1961b..77e4391 100644
+--- a/src/Models/Models.cs
++++ b/src/Models/Models.cs
+@@ -248,6 +248,12 @@ public sealed class SpeechBubble
+     public double PivotY { get; set; } = 1;
+     // 사용자가 지정한 글자 크기(= 최대). 실제 렌더 크기(TextBlock.FontSize)는 말풍선이 작으면 이 값 이하로 자동 축소된다.
+     public double MaxFontSize { get; set; } = 18;
++    // 모서리 조절(사변형 일그러뜨림) 변위. 칸과 동일하게 TL,TR,BR,BL 순서. 기본 0이면 일그러짐 없음.
++    public Point[] CornerOffsets { get; } = { new Point(), new Point(), new Point(), new Point() };
++    // 모서리 조절을 도형(본체·꼬리·외곽선)에 적용할지.
++    public bool WarpShape { get; set; }
++    // 모서리 조절을 안의 글자에 적용할지.
++    public bool WarpText { get; set; }
+ 
+     public override string ToString()
+     {
+@@ -321,6 +327,19 @@ public sealed class OutlinedTextBlock : FrameworkElement
+         nameof(Padding), typeof(Thickness), typeof(OutlinedTextBlock),
+         new FrameworkPropertyMetadata(new Thickness(0), FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender));
+ 
++    // 모서리 조절(사변형 워프): 4개 모서리 변위(TL,TR,BR,BL). null이면 워프 없음.
++    public static readonly DependencyProperty WarpOffsetsProperty = DependencyProperty.Register(
++        nameof(WarpOffsets), typeof(Point[]), typeof(OutlinedTextBlock),
++        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
++
++    // 워프 기준이 되는 컨테이너(말풍선) 크기. 글자 요소는 여백만큼 안쪽에 놓이므로 함께 필요.
++    public static readonly DependencyProperty WarpContainerSizeProperty = DependencyProperty.Register(
++        nameof(WarpContainerSize), typeof(Size), typeof(OutlinedTextBlock),
++        new FrameworkPropertyMetadata(new Size(0, 0), FrameworkPropertyMetadataOptions.AffectsRender));
++
++    public Point[]? WarpOffsets { get => (Point[]?)GetValue(WarpOffsetsProperty); set => SetValue(WarpOffsetsProperty, value); }
++    public Size WarpContainerSize { get => (Size)GetValue(WarpContainerSizeProperty); set => SetValue(WarpContainerSizeProperty, value); }
++
+     public string Text { get => (string)GetValue(TextProperty); set => SetValue(TextProperty, value); }
+     public Brush Fill { get => (Brush)GetValue(FillProperty); set => SetValue(FillProperty, value); }
+     public Brush Stroke { get => (Brush)GetValue(StrokeProperty); set => SetValue(StrokeProperty, value); }
+@@ -332,7 +351,24 @@ public sealed class OutlinedTextBlock : FrameworkElement
+     public TextWrapping TextWrapping { get => (TextWrapping)GetValue(TextWrappingProperty); set => SetValue(TextWrappingProperty, value); }
+     public Thickness Padding { get => (Thickness)GetValue(PaddingProperty); set => SetValue(PaddingProperty, value); }
+ 
+-    private FormattedText CreateFormattedText(double maxWidth)
++    // 구간별 서식(글자색·글씨체·아웃라인색). 이어 붙이면 Text와 같아야 한다. null/빈 항목은 기본값 상속.
++    // 색/아웃라인 변형이 있으면 채움색별 그룹으로 렌더하고, 글꼴만 다르면 단일 경로에서도 반영된다.
++    private List<FlowTextRun>? _styledRuns;
++    public List<FlowTextRun>? StyledRuns
++    {
++        get => _styledRuns;
++        set { _styledRuns = value; InvalidateMeasure(); InvalidateVisual(); }
++    }
++
++    // 줄간격(px). 0이면 글꼴 기본 줄간격.
++    private double _lineHeight;
++    public double LineHeight
++    {
++        get => _lineHeight;
++        set { _lineHeight = value; InvalidateMeasure(); InvalidateVisual(); }
++    }
++
++    private FormattedText BuildFormattedText(double fontSize, double maxWidth)
+     {
+         var typeface = new Typeface(FontFamily ?? new FontFamily("Segoe UI"), FontStyles.Normal, FontWeight, FontStretches.Normal);
+         var ft = new FormattedText(
+@@ -340,7 +376,7 @@ public sealed class OutlinedTextBlock : FrameworkElement
+             System.Globalization.CultureInfo.CurrentUICulture,
+             FlowDirection.LeftToRight,
+             typeface,
+-            Math.Max(1, FontSize),
++            Math.Max(1, fontSize),
+             Fill ?? Brushes.Black,
+             VisualTreeHelper.GetDpi(this).PixelsPerDip)
+         {
+@@ -352,30 +388,96 @@ public sealed class OutlinedTextBlock : FrameworkElement
+             ft.MaxTextWidth = Math.Max(1, maxWidth);
+         }
+ 
++        if (_lineHeight > 0)
++        {
++            ft.LineHeight = _lineHeight; // 0/미지정이면 글꼴 기본 줄간격.
++        }
++
++        ApplyRunFonts(ft);
+         return ft;
+     }
+ 
+-    // 지정한 글자 크기로 줄바꿈(maxWidth)했을 때의 텍스트 크기를 잰다(자동 축소 계산용).
+-    public Size MeasureAtFont(double fontSize, double maxWidth)
++    private FormattedText CreateFormattedText(double maxWidth) => BuildFormattedText(FontSize, maxWidth);
++
++    // 구간별 글꼴을 FormattedText의 문자 범위에 적용한다(측정·렌더 공용). 색/아웃라인은 그룹 렌더에서 처리.
++    private void ApplyRunFonts(FormattedText ft)
+     {
+-        var typeface = new Typeface(FontFamily ?? new FontFamily("Segoe UI"), FontStyles.Normal, FontWeight, FontStretches.Normal);
+-        var ft = new FormattedText(
+-            Text ?? string.Empty,
+-            System.Globalization.CultureInfo.CurrentUICulture,
+-            FlowDirection.LeftToRight,
+-            typeface,
+-            Math.Max(1, fontSize),
+-            Brushes.Black,
+-            VisualTreeHelper.GetDpi(this).PixelsPerDip)
++        var runs = _styledRuns;
++        if (runs == null || runs.Count == 0)
+         {
+-            TextAlignment = TextAlignment
+-        };
++            return;
++        }
+ 
+-        if (TextWrapping != TextWrapping.NoWrap && maxWidth > 0 && !double.IsInfinity(maxWidth))
++        var total = (Text ?? string.Empty).Length;
++        var pos = 0;
++        foreach (var r in runs)
+         {
+-            ft.MaxTextWidth = Math.Max(1, maxWidth);
++            var len = r.Text.Length;
++            if (len <= 0 || pos >= total)
++            {
++                pos += len;
++                continue;
++            }
++            var start = pos;
++            pos += len;
++            var count = Math.Min(len, total - start);
++            if (!string.IsNullOrEmpty(r.FontFamily))
++            {
++                try { ft.SetFontFamily(new FontFamily(r.FontFamily), start, count); } catch { /* 알 수 없는 글꼴 무시 */ }
++            }
++        }
++    }
++
++    // 구간마다 고유 키색을 전경색으로 부여하고 키색 → (실제 채움,아웃라인) 매핑을 만든다.
++    // 같은 채움색이라도 아웃라인이 다르면 다른 키 → 다른 글리프런으로 분리되어 독립 렌더된다(키색은 그리지 않음).
++    private void AssignRunKeys(FormattedText ft, Dictionary<Color, (Color Fill, Color Outline)> keyToPair)
++    {
++        var runs = _styledRuns;
++        if (runs == null)
++        {
++            return;
++        }
++
++        var baseFill = (Fill as SolidColorBrush)?.Color ?? Colors.Black;
++        var baseStroke = (Stroke as SolidColorBrush)?.Color ?? Colors.Transparent;
++        var total = (Text ?? string.Empty).Length;
++        var pos = 0;
++        var pairKeys = new Dictionary<(Color, Color), Color>();
++        var seq = 0;
++        foreach (var r in runs)
++        {
++            var len = r.Text.Length;
++            if (len <= 0 || pos >= total)
++            {
++                pos += len;
++                continue;
++            }
++            var start = pos;
++            pos += len;
++            var count = Math.Min(len, total - start);
++            var fill = string.IsNullOrEmpty(r.Color) ? baseFill : ParseHexColor(r.Color, baseFill);
++            var outline = string.IsNullOrEmpty(r.OutlineColor) ? baseStroke : ParseHexColor(r.OutlineColor, baseStroke);
++            var pk = (fill, outline);
++            if (!pairKeys.TryGetValue(pk, out var key))
++            {
++                key = Color.FromArgb(255, (byte)(seq >> 16), (byte)(seq >> 8), (byte)seq);
++                seq++;
++                pairKeys[pk] = key;
++                keyToPair[key] = (fill, outline);
++            }
++            try { ft.SetForegroundBrush(new SolidColorBrush(key), start, count); } catch { /* 범위 오류 무시 */ }
+         }
++    }
+ 
++    private static Color ParseHexColor(string hex, Color fallback)
++    {
++        try { return (Color)ColorConverter.ConvertFromString(hex); } catch { return fallback; }
++    }
++
++    // 지정한 글자 크기로 줄바꿈(maxWidth)했을 때의 텍스트 크기를 잰다(자동 축소 계산용). 구간별 글꼴 반영.
++    public Size MeasureAtFont(double fontSize, double maxWidth)
++    {
++        var ft = BuildFormattedText(fontSize, maxWidth);
+         return new Size(ft.Width, ft.Height);
+     }
+ 
+@@ -392,7 +494,25 @@ public sealed class OutlinedTextBlock : FrameworkElement
+         var pad = Padding;
+         var maxWidth = Math.Max(0, ActualWidth - pad.Left - pad.Right);
+         var ft = CreateFormattedText(maxWidth);
+-        var geometry = ft.BuildGeometry(new Point(pad.Left, pad.Top));
++        var origin = new Point(pad.Left, pad.Top);
++
++        var offs = WarpOffsets;
++        var warpActive = offs != null && offs.Length == 4 && WarpHasOffset(offs)
++                         && WarpContainerSize.Width > 0 && WarpContainerSize.Height > 0;
++
++        // 구간별 색/아웃라인이 있으면 채움색별 그룹으로 그린다(글꼴은 ft에 이미 반영됨).
++        if (NeedGroupedRender())
++        {
++            RenderGroupedRuns(drawingContext, ft, origin, warpActive);
++            return;
++        }
++
++        // 단일 경로: 한 색/한 아웃라인(구간별 글꼴은 ft에 반영되어 BuildGeometry에 포함).
++        var geometry = ft.BuildGeometry(origin);
++        if (warpActive)
++        {
++            geometry = WarpTextGeometry(geometry, offs!);
++        }
+ 
+         // 아웃라인 색이 불투명할 때만 그린다(투명 = 아웃라인 없음). 별도 ON/OFF 없이 색으로만 제어.
+         if (Stroke is SolidColorBrush strokeBrush && strokeBrush.Color.A > 0)
+@@ -408,6 +528,184 @@ public sealed class OutlinedTextBlock : FrameworkElement
+ 
+         drawingContext.DrawGeometry(Fill, null, geometry);
+     }
++
++    private bool NeedGroupedRender()
++    {
++        var runs = _styledRuns;
++        if (runs == null)
++        {
++            return false;
++        }
++        foreach (var r in runs)
++        {
++            if (!string.IsNullOrEmpty(r.Color) || !string.IsNullOrEmpty(r.OutlineColor))
++            {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    // 구간별 채움/아웃라인 렌더: ft를 비주얼에 그려 글리프(런별 전경색 포함)를 얻고, 채움색별로 묶어
++    // 1패스 외곽선(채움색→아웃라인색 매핑) + 2패스 채움으로 그린다. 워프도 글리프별로 적용.
++    private void RenderGroupedRuns(DrawingContext dc, FormattedText ft, Point origin, bool warpActive)
++    {
++        // 구간마다 고유 키색을 전경색으로 부여한 뒤, 그 글리프를 키색별로 묶어 실제 (채움,아웃라인)으로 그린다.
++        var keyToPair = new Dictionary<Color, (Color Fill, Color Outline)>();
++        AssignRunKeys(ft, keyToPair);
++
++        var temp = new DrawingVisual();
++        using (var c = temp.RenderOpen())
++        {
++            c.DrawText(ft, origin);
++        }
++
++        var byColor = new Dictionary<Color, GeometryGroup>();
++        var dg = VisualTreeHelper.GetDrawing(temp);
++        if (dg != null)
++        {
++            CollectRunGlyphs(dg, Matrix.Identity, byColor, warpActive);
++        }
++        if (byColor.Count == 0)
++        {
++            return;
++        }
++
++        var baseFill = (Fill as SolidColorBrush)?.Color ?? Colors.Black;
++        var baseStroke = (Stroke as SolidColorBrush)?.Color ?? Colors.Transparent;
++        var penWidth = Math.Max(3, FontSize / 3.5);
++
++        // 1패스: 외곽선(모든 글자 뒤로).
++        foreach (var kv in byColor)
++        {
++            var pair = keyToPair.TryGetValue(kv.Key, out var p) ? p : (baseFill, baseStroke);
++            if (pair.Item2.A == 0)
++            {
++                continue;
++            }
++            var pen = new Pen(new SolidColorBrush(pair.Item2), penWidth) { LineJoin = PenLineJoin.Round, MiterLimit = 2 };
++            dc.DrawGeometry(null, pen, kv.Value);
++        }
++        // 2패스: 채움(각 구간의 실제 채움색).
++        foreach (var kv in byColor)
++        {
++            var pair = keyToPair.TryGetValue(kv.Key, out var p) ? p : (baseFill, baseStroke);
++            dc.DrawGeometry(new SolidColorBrush(pair.Item1), null, kv.Value);
++        }
++    }
++
++    private void CollectRunGlyphs(Drawing d, Matrix m, Dictionary<Color, GeometryGroup> acc, bool warpActive)
++    {
++        switch (d)
++        {
++            case DrawingGroup dg:
++                var gm = m;
++                if (dg.Transform != null && !dg.Transform.Value.IsIdentity)
++                {
++                    gm = dg.Transform.Value * m;
++                }
++                foreach (var child in dg.Children)
++                {
++                    CollectRunGlyphs(child, gm, acc, warpActive);
++                }
++                break;
++
++            case GlyphRunDrawing grd when grd.GlyphRun != null:
++                Geometry geo = grd.GlyphRun.BuildGeometry();
++                if (geo == null || geo.IsEmpty())
++                {
++                    break;
++                }
++                if (!m.IsIdentity)
++                {
++                    geo.Transform = new MatrixTransform(m);
++                }
++                if (warpActive)
++                {
++                    geo = WarpTextGeometry(geo, WarpOffsets!);
++                }
++                var color = (grd.ForegroundBrush as SolidColorBrush)?.Color
++                            ?? ((Fill as SolidColorBrush)?.Color ?? Colors.Black);
++                if (!acc.TryGetValue(color, out var grp))
++                {
++                    grp = new GeometryGroup { FillRule = FillRule.Nonzero };
++                    acc[color] = grp;
++                }
++                grp.Children.Add(geo);
++                break;
++        }
++    }
++
++    // 글리프 도형을 잘게 직선화한 뒤, 글자 요소 로컬 좌표를 '컨테이너 좌표 → 사변형 워프 → 다시 요소 로컬'로 옮긴다.
++    private Geometry WarpTextGeometry(Geometry geometry, Point[] offs)
++    {
++        var cw = WarpContainerSize.Width;
++        var ch = WarpContainerSize.Height;
++        var m = Margin;
++        // 글자 요소의 컨테이너 내 좌상단(가로는 stretch라 Margin.Left, 세로는 세로 맞춤에 따라 보정).
++        var ox = m.Left;
++        var slotH = ch - m.Top - m.Bottom;
++        var extra = Math.Max(0, slotH - ActualHeight);
++        var oy = VerticalAlignment switch
++        {
++            System.Windows.VerticalAlignment.Top => m.Top,
++            System.Windows.VerticalAlignment.Bottom => m.Top + extra,
++            _ => m.Top + extra / 2 // Center/Stretch
++        };
++
++        var flat = geometry.GetFlattenedPathGeometry(0.2, ToleranceType.Absolute);
++        var result = new PathGeometry { FillRule = flat.FillRule };
++        foreach (var fig in flat.Figures)
++        {
++            var nf = new PathFigure
++            {
++                IsClosed = fig.IsClosed,
++                IsFilled = fig.IsFilled,
++                StartPoint = WarpLocal(fig.StartPoint, ox, oy, cw, ch, offs)
++            };
++            foreach (var seg in fig.Segments)
++            {
++                if (seg is PolyLineSegment pls)
++                {
++                    var pts = new PointCollection();
++                    foreach (var p in pls.Points)
++                    {
++                        pts.Add(WarpLocal(p, ox, oy, cw, ch, offs));
++                    }
++                    nf.Segments.Add(new PolyLineSegment(pts, seg.IsStroked));
++                }
++                else if (seg is LineSegment ls)
++                {
++                    nf.Segments.Add(new LineSegment(WarpLocal(ls.Point, ox, oy, cw, ch, offs), ls.IsStroked));
++                }
++            }
++            result.Figures.Add(nf);
++        }
++        return result;
++    }
++
++    private static Point WarpLocal(Point p, double ox, double oy, double cw, double ch, Point[] o)
++    {
++        var w = WarpBilinear(ox + p.X, oy + p.Y, cw, ch, o);
++        return new Point(w.X - ox, w.Y - oy);
++    }
++
++    private static Point WarpBilinear(double x, double y, double w, double h, Point[] o)
++    {
++        var u = w > 0 ? x / w : 0;
++        var v = h > 0 ? y / h : 0;
++        var tlX = o[0].X;          var tlY = o[0].Y;
++        var trX = w + o[1].X;      var trY = o[1].Y;
++        var brX = w + o[2].X;      var brY = h + o[2].Y;
++        var blX = o[3].X;          var blY = h + o[3].Y;
++        var nx = (1 - u) * (1 - v) * tlX + u * (1 - v) * trX + u * v * brX + (1 - u) * v * blX;
++        var ny = (1 - u) * (1 - v) * tlY + u * (1 - v) * trY + u * v * brY + (1 - u) * v * blY;
++        return new Point(nx, ny);
++    }
++
++    private static bool WarpHasOffset(Point[] o)
++        => o[0].X != 0 || o[0].Y != 0 || o[1].X != 0 || o[1].Y != 0
++           || o[2].X != 0 || o[2].Y != 0 || o[3].X != 0 || o[3].Y != 0;
+ }
+ 
+ public sealed class BubbleTail
+diff --git a/src/Models/ProjectData.cs b/src/Models/ProjectData.cs
+index 5503051..ac2ce54 100644
+--- a/src/Models/ProjectData.cs
++++ b/src/Models/ProjectData.cs
+@@ -7,6 +7,51 @@ public sealed class ComicProjectData
+     public double AutoGutter { get; set; } = 14;
+     public int CurrentPageIndex { get; set; }
+     public List<ComicPageData> Pages { get; set; } = new();
++    // 프로젝트 전체에 걸쳐 페이지별로 자동 분할(노벨 뷰어) 표시되는 본문 텍스트.
++    public FlowTextData FlowText { get; set; } = new();
++}
++
++// 여러 페이지에 흘려 보여줄 본문 텍스트와 서식. 분할은 페이지 크기·이 서식으로 계산된다.
++public sealed class FlowTextData
++{
++    // 텍스트 모드 ON/OFF. OFF면 본문을 페이지에 표시하지 않고 인스펙터 텍스트 섹션도 숨긴다.
++    public bool Enabled { get; set; }
++    public string Text { get; set; } = string.Empty;
++    public string FontFamily { get; set; } = "Malgun Gothic"; // 빈 값이면 기본 글꼴. 기본은 말풍선과 동일.
++    public double FontSize { get; set; } = 20;
++    public double LineHeight { get; set; } = 30;            // 0이면 글꼴 기본 줄간격.
++    public string Alignment { get; set; } = "Justify";      // Left/Center/Right/Justify.
++    public double MarginLeft { get; set; } = 30;
++    public double MarginTop { get; set; } = 30;
++    public double MarginRight { get; set; } = 30;
++    public double MarginBottom { get; set; } = 30;
++    public string Color { get; set; } = "#FFFFFF";
++    // 글자 아웃라인(외곽선) 색. 알파 0(투명)이면 외곽선 없음(말풍선과 동일하게 색으로만 제어).
++    public string OutlineColor { get; set; } = "#000000";
++    // 페이지보다 뒤에 깔리는 단일 배경색. 페이지 배경이 투명이면 이 색이 비쳐 보인다. 알파 0이면 없음.
++    public string BackdropColor { get; set; } = "#FFFFFF";
++    // 구간별 서식(글자색·글씨체·아웃라인색). 순서대로 본문 전체를 덮으며, 이어 붙이면 Text와 같다.
++    // 비어 있으면(구버전) 불러올 때 Text 한 덩어리로 마이그레이션한다.
++    public List<FlowTextRun> Runs { get; set; } = new();
++
++    // Runs를 깊은 복사한다(MemberwiseClone은 리스트 참조를 공유해 실행취소가 오염되므로 직접 복사).
++    public FlowTextData Clone()
++    {
++        var c = (FlowTextData)MemberwiseClone();
++        c.Runs = Runs.Select(r => r.Clone()).ToList();
++        return c;
++    }
++}
++
++// 본문 텍스트의 한 구간(스팬). 색/글꼴/아웃라인이 null·빈 값이면 문서 기본값을 따른다.
++public sealed class FlowTextRun
++{
++    public string Text { get; set; } = string.Empty;
++    public string? FontFamily { get; set; }
++    public string? Color { get; set; }
++    public string? OutlineColor { get; set; }
++
++    public FlowTextRun Clone() => (FlowTextRun)MemberwiseClone();
+ }
+ 
+ public sealed class ComicPageData : System.ComponentModel.INotifyPropertyChanged
+@@ -97,6 +142,14 @@ public sealed class SpeechBubbleData
+     public double FontSize { get; set; } = 18;
+     // 글꼴 이름(시스템 글꼴). 빈 값이면 기본 글꼴.
+     public string FontFamily { get; set; } = string.Empty;
++    // 가로 맞춤(Left/Center/Right/Justify). 빈 값이면 가운데.
++    public string TextAlignment { get; set; } = "Center";
++    // 세로 맞춤(Top/Center/Bottom). 빈 값이면 가운데.
++    public string VerticalAlignment { get; set; } = "Center";
++    // 구간별 서식(글자색·글씨체·아웃라인색). 비어 있으면 Text 한 덩어리(단일 서식)로 본다.
++    public List<FlowTextRun> Runs { get; set; } = new();
++    // 줄간격(px). 0이면 글꼴 기본 줄간격.
++    public double LineHeight { get; set; }
+     public double TextMarginLeft { get; set; } = 16;
+     public double TextMarginTop { get; set; } = 12;
+     public double TextMarginRight { get; set; } = 16;
+@@ -116,6 +169,11 @@ public sealed class SpeechBubbleData
+     public double ShapeIrregularity { get; set; } = 50;
+     // 폭 불규칙도(0~100, 구름/폭발 전용). 0/미지정이면 효과 없음.
+     public double ShapeWidthVariation { get; set; }
++    // 모서리 조절(사변형 일그러뜨림) 변위 TL,TR,BR,BL × X,Y = 8개. 0이면 일그러짐 없음.
++    public double[] CornerOffsets { get; set; } = new double[8];
++    // 모서리 조절을 도형/글자에 적용할지(개별).
++    public bool WarpShape { get; set; }
++    public bool WarpText { get; set; }
+     public bool TailInward { get; set; }
+     public double PivotX { get; set; }
+     public double PivotY { get; set; } = 1;

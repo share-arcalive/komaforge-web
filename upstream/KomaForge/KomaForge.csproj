@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon />
+    <Version>0.1.5</Version>
+    <Product>KomaForge</Product>
+    <Description>망가 페이지 에디터</Description>
+    <Authors>unknowndevdot</Authors>
+    <Company>unknowndevdot</Company>
+    <Copyright>Copyright © 2026 unknowndevdot</Copyright>
+    <RepositoryUrl>https://github.com/unknowndevdot/KomaForge</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <!-- 단일 파일 퍼블리시 시 네이티브 DLL(SkiaSharp·Magick.NET)을 exe에 묻어 실행 시 임시 추출. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Magick.NET-Q8-x64" Version="14.14.0" />
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 비주얼 노벨 모드 진입 시 템플릿이 없으면 생성하는 기본 템플릿('이름'·'서술' 말풍선). -->
+    <EmbeddedResource Include="Resources\DefaultVnTemplate.json" />
+  </ItemGroup>
+</Project>

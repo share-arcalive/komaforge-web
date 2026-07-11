@@ -1,0 +1,16 @@
+# .NET build output
+bin/
+obj/
+
+# Published single-file build output
+dist/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+
+# Local app settings written at runtime
+*.local.json

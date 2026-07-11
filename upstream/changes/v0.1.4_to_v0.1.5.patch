@@ -1,0 +1,409 @@
+diff --git a/KomaForge.csproj b/KomaForge.csproj
+index 0c838bb..baaf291 100644
+--- a/KomaForge.csproj
++++ b/KomaForge.csproj
+@@ -6,7 +6,7 @@
+     <ImplicitUsings>enable</ImplicitUsings>
+     <UseWPF>true</UseWPF>
+     <ApplicationIcon />
+-    <Version>0.1.4</Version>
++    <Version>0.1.5</Version>
+     <Product>KomaForge</Product>
+     <Description>망가 페이지 에디터</Description>
+     <Authors>unknowndevdot</Authors>
+diff --git a/MainWindow.xaml b/MainWindow.xaml
+index 4d1c853..55a4516 100644
+--- a/MainWindow.xaml
++++ b/MainWindow.xaml
+@@ -758,6 +758,13 @@
+                             Value="0"
+                             ValueChanged="BubbleShapeWidthVarSlider_ValueChanged"
+                             Margin="0,0,0,2" />
++
++                    <CheckBox x:Name="BubbleLineFadeBothSidesCheckBox"
++                              Content="양쪽 페이드 (양 끝 투명)"
++                              Visibility="Collapsed"
++                              Checked="BubbleLineFadeBothSides_Changed"
++                              Unchecked="BubbleLineFadeBothSides_Changed"
++                              Margin="0,2,0,2" />
+                     </StackPanel>
+                     </Border>
+ 
+@@ -821,6 +828,12 @@
+                               IsChecked="False"
+                               Checked="BubbleTailInwardCheckBox_Changed"
+                               Unchecked="BubbleTailInwardCheckBox_Changed"
++                              Margin="0,0,0,8" />
++                    <CheckBox x:Name="BubbleThoughtTailCheckBox"
++                              Content="생각 꼬리 (원형 3개)"
++                              IsChecked="False"
++                              Checked="BubbleThoughtTail_Changed"
++                              Unchecked="BubbleThoughtTail_Changed"
+                               Margin="0,0,0,12" />
+ 
+                     <StackPanel Visibility="Collapsed">
+@@ -843,7 +856,7 @@
+                     <Slider x:Name="BubbleTailWidthSlider"
+                             Minimum="8"
+                             Maximum="80"
+-                            Value="28"
++                            Value="15"
+                             ValueChanged="BubbleTailSlider_ValueChanged"
+                             Margin="0,4,0,14" />
+                     <TextBlock Text="꼬리는 세 점(시작·중간·끝) 핸들로 곡선을 조절합니다. 주황 핸들(중간)을 끌면 곡선이 휩니다."
+diff --git a/src/MainWindow/MainWindow.Bubbles.cs b/src/MainWindow/MainWindow.Bubbles.cs
+index 3842a26..105aedc 100644
+--- a/src/MainWindow/MainWindow.Bubbles.cs
++++ b/src/MainWindow/MainWindow.Bubbles.cs
+@@ -231,7 +231,7 @@ public partial class MainWindow : Window
+             var warpSig = bubble.WarpShape
+                 ? string.Join(",", bubble.CornerOffsets.Select(p => $"{p.X:F1}:{p.Y:F1}"))
+                 : "off";
+-            var signature = $"{bubble.Shape}|{bubble.Container.Width:F1}|{bubble.Container.Height:F1}|{bubble.ShapeCount}|{bubble.ShapeStrength:F1}|{bubble.ShapeIrregularity:F1}|{ToHex(bubble.TextBlock.Fill)}|{warpSig}";
++            var signature = $"{bubble.Shape}|{bubble.Container.Width:F1}|{bubble.Container.Height:F1}|{bubble.ShapeCount}|{bubble.ShapeStrength:F1}|{bubble.ShapeIrregularity:F1}|{ToHex(bubble.TextBlock.Fill)}|{warpSig}|{bubble.LineFadeBothSides}";
+             if (signature == bubble.LineHostSignature)
+             {
+                 return; // 위치만 바뀐 경우: 로컬 좌표라 그대로 따라오므로 재생성 불필요.
+@@ -273,7 +273,8 @@ public partial class MainWindow : Window
+         foreach (var tail in bubble.Tails)
+         {
+             var tailGeometry = CreateTailGeometry(tail);
+-            var tailMode = tail.TailInward ? GeometryCombineMode.Exclude : GeometryCombineMode.Union;
++            // 생각 꼬리(원 3개)는 항상 합친다(안으로 깎기는 곡선 꼬리에만 의미).
++            var tailMode = (tail.TailInward && !tail.ThoughtTail) ? GeometryCombineMode.Exclude : GeometryCombineMode.Union;
+             shape = Geometry.Combine(shape, tailGeometry, tailMode, null);
+         }
+ 
+@@ -348,6 +349,13 @@ public partial class MainWindow : Window
+         var start = new Point(tail.StartX, tail.StartY);
+         var mid = new Point(tail.MidX, tail.MidY);
+         var end = new Point(tail.X, tail.Y);
++
++        // 생각 말풍선 꼬리: 곡선 대신 시작→(중간 제어점)→끝 곡선을 따라 점점 작아지는 원 3개.
++        if (tail.ThoughtTail)
++        {
++            return CreateThoughtTailGeometry(start, mid, end, tail.Width);
++        }
++
+         var direction = end - start;
+ 
+         if (direction.Length < 1)
+@@ -372,6 +380,32 @@ public partial class MainWindow : Window
+         return new PathGeometry(new[] { figure });
+     }
+ 
++    // 생각 말풍선 꼬리: 시작→(중간 제어점)→끝 이차 베지어 곡선을 따라 점점 작아지는 원 3개(본체 쪽이 가장 큼).
++    private static Geometry CreateThoughtTailGeometry(Point start, Point mid, Point end, double width)
++    {
++        var baseR = Math.Max(6.0, width * 0.9); // 가장 큰 원 반지름(굵기 기준).
++        var t = new[] { 0.4, 0.7, 1.0 };        // 시작점은 본체 안일 수 있어 살짝 바깥(0.4)부터 끝(1.0)까지.
++        var rf = new[] { 1.0, 0.66, 0.42 };     // 점점 작아지는 반지름 비율.
++
++        var group = new GeometryGroup();
++        for (var i = 0; i < 3; i++)
++        {
++            var c = QuadBezierPoint(start, mid, end, t[i]); // 중간 핸들을 제어점으로 한 곡선 위 위치.
++            var r = baseR * rf[i];
++            group.Children.Add(new EllipseGeometry(c, r, r));
++        }
++        return group;
++    }
++
++    // 이차 베지어 곡선 위 점: (1-t)²·P0 + 2(1-t)t·P1 + t²·P2.
++    private static Point QuadBezierPoint(Point p0, Point p1, Point p2, double t)
++    {
++        var u = 1 - t;
++        return new Point(
++            u * u * p0.X + 2 * u * t * p1.X + t * t * p2.X,
++            u * u * p0.Y + 2 * u * t * p1.Y + t * t * p2.Y);
++    }
++
+     private static Thumb CreateTailHandle(Color? color = null)
+     {
+         return new Thumb
+diff --git a/src/MainWindow/MainWindow.Inspector.cs b/src/MainWindow/MainWindow.Inspector.cs
+index 44885a0..d97acf3 100644
+--- a/src/MainWindow/MainWindow.Inspector.cs
++++ b/src/MainWindow/MainWindow.Inspector.cs
+@@ -281,17 +281,26 @@ public partial class MainWindow : Window
+             return;
+         }
+ 
+-        var startX = _selectedBubble.Container.Width / 2;
+-        var startY = _selectedBubble.Container.Height / 2;
++        // 새 꼬리는 본체 아래쪽 중앙에서 곧게 내려가는 '일자' 모양으로, 세 핸들(시작·중간·끝)을 넉넉히 띄워 배치한다.
++        // (기존엔 끝점이 슬라이더 값이라 위치가 들쭉날쭉하고 핸들이 붙어 나오는 경우가 많았다.)
++        var w = _selectedBubble.Container.Width;
++        var h = _selectedBubble.Container.Height;
++        // 여러 개 추가해도 서로의 핸들과 겹치지 않도록 중앙을 기준으로 번갈아 가로로 옮긴다(0, -30, +30, -60, …).
++        var n = _selectedBubble.Tails.Count;
++        var cx = w / 2 + ((n % 2 == 0) ? 1 : -1) * ((n + 1) / 2) * 30.0;
++        var startY = h * 0.72;                    // 본체 안(아래쪽)에서 시작 → 본체와 자연스럽게 합쳐짐
++        // 끝점은 '시작점↔하단 중앙 리사이즈 핸들(y=h)' 거리(= h - startY)만큼 그 핸들에서 더 내려간 위치.
++        var tipY = h + (h - startY);
+         var tail = new BubbleTail
+         {
+-            StartX = startX,
++            StartX = cx,
+             StartY = startY,
+-            MidX = (startX + BubbleTailXSlider.Value) / 2,
+-            MidY = (startY + BubbleTailYSlider.Value) / 2,
+-            X = BubbleTailXSlider.Value,
+-            Y = BubbleTailYSlider.Value,
+-            Width = BubbleTailWidthSlider.Value
++            MidX = cx,
++            // 중간 핸들을 시작점과 하단 중앙 리사이즈 핸들(y=h) '사이'(중점)에 둔다 → 리사이즈 핸들과 겹치지 않게.
++            MidY = (startY + h) / 2,
++            X = cx,
++            Y = tipY,
++            Width = 15 // 꼬리 굵기 기본값.
+         };
+         _selectedBubble.Tails.Add(tail);
+         SelectBubbleTail(tail);
+@@ -556,6 +565,27 @@ public partial class MainWindow : Window
+         UpdateStatus(_selectedBubbleTail.TailInward ? "이 꼬리를 안으로 깎습니다(시작↔끝 교체)." : "이 꼬리를 밖으로 냅니다.");
+     }
+ 
++    // 생각 꼬리(원형 3개) ON/OFF — 선택한 꼬리 개별 값.
++    private void BubbleThoughtTail_Changed(object sender, RoutedEventArgs e)
++    {
++        if (_isLoadingInspector || _selectedBubble == null)
++        {
++            return;
++        }
++
++        if (_selectedBubbleTail == null)
++        {
++            UpdateStatus("생각 꼬리로 바꿀 꼬리를 먼저 선택하세요.");
++            return;
++        }
++
++        _selectedBubbleTail.ThoughtTail = BubbleThoughtTailCheckBox.IsChecked == true;
++        UpdateBubbleGeometry(_selectedBubble);
++        UpdateBubbleTailList(_selectedBubble);
++        BubbleTailListBox.SelectedItem = _selectedBubbleTail;
++        UpdateStatus(_selectedBubbleTail.ThoughtTail ? "이 꼬리를 생각 꼬리(원 3개)로 표시합니다." : "이 꼬리를 일반 곡선 꼬리로 표시합니다.");
++    }
++
+     private static readonly (string Name, string Hex)[] ColorPalette =
+     {
+         ("검정", "#000000"), ("흰색", "#FFFFFF"), ("회색", "#868E96"),
+@@ -833,6 +863,12 @@ public partial class MainWindow : Window
+         SetShapeOptionVisible(BubbleShapeCountText, BubbleShapeCountSlider, hasCountAndIrregularity);
+         SetShapeOptionVisible(BubbleShapeIrregularityText, BubbleShapeIrregularitySlider, hasCountAndIrregularity);
+         SetShapeOptionVisible(BubbleShapeWidthVarText, BubbleShapeWidthVarSlider, hasWidthVar);
++        // 양쪽 페이드는 속도선에서만 의미가 있다.
++        if (BubbleLineFadeBothSidesCheckBox != null)
++        {
++            BubbleLineFadeBothSidesCheckBox.Visibility =
++                shape == BubbleShape.EffectLines ? Visibility.Visible : Visibility.Collapsed;
++        }
+         // 글자 회전은 선효과(속도선·집중선)를 뺀 모든 말풍선에서 보여 준다.
+         SetShapeOptionVisible(BubbleTextRotationText, BubbleTextRotationSlider, !IsLineEffectShape(shape));
+ 
+@@ -888,6 +924,18 @@ public partial class MainWindow : Window
+         UpdateBubbleGeometry(_selectedBubble);
+     }
+ 
++    // 속도선 양쪽 페이드 ON/OFF.
++    private void BubbleLineFadeBothSides_Changed(object sender, RoutedEventArgs e)
++    {
++        if (_isLoadingInspector || _selectedBubble == null)
++        {
++            return;
++        }
++
++        _selectedBubble.LineFadeBothSides = BubbleLineFadeBothSidesCheckBox.IsChecked == true;
++        UpdateBubbleGeometry(_selectedBubble);
++    }
++
+     private void BubbleShapeCountSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+     {
+         if (BubbleShapeCountText != null)
+diff --git a/src/MainWindow/MainWindow.Pages.cs b/src/MainWindow/MainWindow.Pages.cs
+index 5312b96..e66d878 100644
+--- a/src/MainWindow/MainWindow.Pages.cs
++++ b/src/MainWindow/MainWindow.Pages.cs
+@@ -174,6 +174,7 @@ public partial class MainWindow : Window
+             ShapeStrength = bubble.ShapeStrength,
+             ShapeIrregularity = bubble.ShapeIrregularity,
+             ShapeWidthVariation = bubble.ShapeWidthVariation,
++            LineFadeBothSides = bubble.LineFadeBothSides,
+             CornerOffsets = PanelOffsetsToArray(bubble.CornerOffsets),
+             WarpShape = bubble.WarpShape,
+             WarpText = bubble.WarpText,
+@@ -190,7 +191,8 @@ public partial class MainWindow : Window
+                     X = tail.X,
+                     Y = tail.Y,
+                     Width = tail.Width,
+-                    TailInward = tail.TailInward
++                    TailInward = tail.TailInward,
++                    ThoughtTail = tail.ThoughtTail
+                 })
+                 .ToList()
+         };
+@@ -450,6 +452,7 @@ public partial class MainWindow : Window
+         // 0/미지정(구버전)이면 기존 기본 흔들림 50으로 본다.
+         bubble.ShapeIrregularity = bubbleData.ShapeIrregularity <= 0 ? 50 : bubbleData.ShapeIrregularity;
+         bubble.ShapeWidthVariation = bubbleData.ShapeWidthVariation;
++        bubble.LineFadeBothSides = bubbleData.LineFadeBothSides;
+         ApplyArrayToPanelOffsets(bubbleData.CornerOffsets, bubble.CornerOffsets);
+         bubble.WarpShape = bubbleData.WarpShape;
+         bubble.TextRotation = bubbleData.TextRotation;
+@@ -467,7 +470,8 @@ public partial class MainWindow : Window
+             Y = tail.Y,
+             Width = tail.Width,
+             // 구버전(말풍선 단위) 저장 호환: 말풍선 값이 켜져 있으면 모든 꼬리에 적용.
+-            TailInward = tail.TailInward || bubbleData.TailInward
++            TailInward = tail.TailInward || bubbleData.TailInward,
++            ThoughtTail = tail.ThoughtTail
+         }));
+         UpdateBubbleGeometry(bubble);
+ 
+diff --git a/src/MainWindow/MainWindow.Selection.cs b/src/MainWindow/MainWindow.Selection.cs
+index 83b3705..3a39b90 100644
+--- a/src/MainWindow/MainWindow.Selection.cs
++++ b/src/MainWindow/MainWindow.Selection.cs
+@@ -80,6 +80,7 @@ public partial class MainWindow : Window
+         BubbleTailYSlider.Value = Math.Clamp(tail.Y, BubbleTailYSlider.Minimum, BubbleTailYSlider.Maximum);
+         BubbleTailWidthSlider.Value = Math.Clamp(tail.Width, BubbleTailWidthSlider.Minimum, BubbleTailWidthSlider.Maximum);
+         BubbleTailInwardCheckBox.IsChecked = tail.TailInward; // '안으로 깎기'는 선택한 꼬리 개별 값.
++        BubbleThoughtTailCheckBox.IsChecked = tail.ThoughtTail; // '생각 꼬리'도 꼬리 개별 값.
+         _isLoadingInspector = false;
+         UpdateBubbleTailHandles(_selectedBubble);
+         UpdateBubbleTailList(_selectedBubble);
+@@ -202,9 +203,11 @@ public partial class MainWindow : Window
+         BubbleShapeWidthVarText.Text = $"불규칙도(폭): {BubbleShapeWidthVarSlider.Value:0}";
+         BubbleTextRotationSlider.Value = Math.Clamp(bubble.TextRotation, BubbleTextRotationSlider.Minimum, BubbleTextRotationSlider.Maximum);
+         BubbleTextRotationText.Text = $"텍스트 회전: {BubbleTextRotationSlider.Value:0}°";
++        BubbleLineFadeBothSidesCheckBox.IsChecked = bubble.LineFadeBothSides;
+         UpdateBubbleShapeOptionVisibility(bubble.Shape);
+         // '안으로 깎기'는 선택한 꼬리 개별 값이므로, 선택된 꼬리가 있으면 그 값으로(없으면 해제).
+         BubbleTailInwardCheckBox.IsChecked = _selectedBubbleTail?.TailInward == true;
++        BubbleThoughtTailCheckBox.IsChecked = _selectedBubbleTail?.ThoughtTail == true;
+         BubbleShapeComboBox.SelectedIndex = bubble.Shape switch
+         {
+             BubbleShape.CloudExplosion => 1,
+diff --git a/src/MainWindow/MainWindow.Shapes.cs b/src/MainWindow/MainWindow.Shapes.cs
+index 99b380e..b1c46fa 100644
+--- a/src/MainWindow/MainWindow.Shapes.cs
++++ b/src/MainWindow/MainWindow.Shapes.cs
+@@ -130,6 +130,26 @@ public partial class MainWindow : Window
+         return brush;
+     }
+ 
++    // 양쪽 끝을 모두 투명하게(가운데 불투명) 페이드하는 브러시 — 속도선 '양쪽 페이드' 옵션용.
++    private static Brush CreateBothSidesFadeBrush(Brush lineBrush, Point start, Point end)
++    {
++        var color = (lineBrush as SolidColorBrush)?.Color ?? Colors.Black;
++        var clear = Color.FromArgb(0, color.R, color.G, color.B);
++        var solid = Color.FromArgb(255, color.R, color.G, color.B);
++        var brush = new LinearGradientBrush
++        {
++            MappingMode = BrushMappingMode.Absolute,
++            StartPoint = start,
++            EndPoint = end
++        };
++        brush.GradientStops.Add(new GradientStop(clear, 0.0));   // 한쪽 끝: 투명
++        brush.GradientStops.Add(new GradientStop(solid, 0.3));   // 안쪽: 불투명
++        brush.GradientStops.Add(new GradientStop(solid, 0.7));   // 안쪽: 불투명
++        brush.GradientStops.Add(new GradientStop(clear, 1.0));   // 반대쪽 끝: 투명
++        brush.Freeze();
++        return brush;
++    }
++
+     // 집중선: 중앙을 향하는 방사형 직선들. 돌기 ×10.
+     // 선의 기하(시작/끝점)는 강도와 무관하게 고정이고, 강도는 페이드(중앙의 투명 반지름)만 키운다.
+     // 투명 경계는 박스 비율과 무관한 정원, 선 끝은 사각형 가장자리.
+@@ -230,7 +250,7 @@ public partial class MainWindow : Window
+     // 속도선(효과선): 한 방향으로 직진하는 일직선 평행선들. 강도 0~100 → 방향 0~360도.
+     // 각 선의 길이가 제각각이고 선 사이 간격도 일정하지 않다. 돌기 ×10.
+     // (베이스 = -d쪽 시작점, 팁 = 진행 방향 끝점) 목록을 만든다.
+-    private static List<(Point Base, Point Tip)> EffectLineEndpoints(double width, double height, int count, double strength, double irregularity)
++    private static List<(Point Base, Point Tip)> EffectLineEndpoints(double width, double height, int count, double strength, double irregularity, bool centered = false)
+     {
+         var t = Math.Clamp(strength, 0, 100) / 100.0;
+         var m = IrregularityMul(irregularity);
+@@ -256,8 +276,9 @@ public partial class MainWindow : Window
+             var raw = 0.30 + 0.70 * Pseudo(i * 5.3 + 0.9);
+             var lenFrac = Math.Clamp(1.0 + (raw - 1.0) * m, 0.1, 1.5);
+             var length = span * lenFrac;
+-            var a0 = -half;
+-            var a1 = -half + length;
++            // 양쪽 페이드(centered)면 각 선을 중앙 기준 ±length/2로 배치(중앙 정렬·좌우 대칭). 아니면 한쪽 끝(-half)에서 시작.
++            var a0 = centered ? -length / 2.0 : -half;
++            var a1 = centered ? length / 2.0 : -half + length;
+             var baseP = new Point(cx + dx * a0 + px * perp, cy + dy * a0 + py * perp);
+             var tip = new Point(cx + dx * a1 + px * perp, cy + dy * a1 + py * perp);
+             result.Add((baseP, tip));
+@@ -296,7 +317,7 @@ public partial class MainWindow : Window
+         var warp = bubble.WarpShape && HasCornerWarp(bubble.CornerOffsets);
+         var o = bubble.CornerOffsets;
+ 
+-        foreach (var (baseP, tip) in EffectLineEndpoints(w, h, bubble.ShapeCount, bubble.ShapeStrength, bubble.ShapeIrregularity))
++        foreach (var (baseP, tip) in EffectLineEndpoints(w, h, bubble.ShapeCount, bubble.ShapeStrength, bubble.ShapeIrregularity, bubble.LineFadeBothSides))
+         {
+             // 베이스→팁 선분을 박스로 클립해 보이는 구간만 남긴다(c0=베이스쪽, c1=팁쪽).
+             if (!ClipSegmentToBox(baseP, tip, w, h, out var c0, out var c1))
+@@ -310,8 +331,10 @@ public partial class MainWindow : Window
+             var path = new System.Windows.Shapes.Path
+             {
+                 Data = new LineGeometry(a, b),
+-                // 팁(c1) 투명 → 베이스(c0) 불투명. 보이는 구간 기준이라 선마다 자기 시작점부터 페이드된다.
+-                Stroke = CreateDirectionFadeBrush(lineColor, b, a),
++                // 양쪽 페이드 ON이면 양 끝 모두 투명(가운데 불투명), OFF면 팁(b) 투명 → 베이스(a) 불투명.
++                Stroke = bubble.LineFadeBothSides
++                    ? CreateBothSidesFadeBrush(lineColor, a, b)
++                    : CreateDirectionFadeBrush(lineColor, b, a),
+                 StrokeThickness = 1.6,
+                 IsHitTestVisible = false
+             };
+diff --git a/src/Models/Models.cs b/src/Models/Models.cs
+index afacd6a..22be405 100644
+--- a/src/Models/Models.cs
++++ b/src/Models/Models.cs
+@@ -252,6 +252,8 @@ public sealed class SpeechBubble
+     public double ShapeIrregularity { get; set; } = 50;
+     // 폭 불규칙도(0~100, 구름/폭발 전용): 상하좌우(변 중앙)를 바깥으로 넓혀 모서리가 패인 모양을 만든다. 0이면 효과 없음.
+     public double ShapeWidthVariation { get; set; }
++    // 속도선: 각 선을 양쪽 끝 모두 투명하게 페이드할지(기본 OFF = 한쪽만 투명해짐).
++    public bool LineFadeBothSides { get; set; }
+     // 말풍선 배경색(채움). 기본 흰색.
+     public Brush BackgroundBrush { get; set; } = Brushes.White;
+     // 말풍선 테두리(외곽선) 색. 기본 검정.
+@@ -744,10 +746,12 @@ public sealed class BubbleTail
+     public double Width { get; set; } = 28;
+     // 이 꼬리를 본체에서 안으로 깎을지(개별 적용).
+     public bool TailInward { get; set; }
++    // 생각 말풍선 꼬리: 곡선 대신 점점 작아지는 원 3개로 표시(개별 적용).
++    public bool ThoughtTail { get; set; }
+ 
+     public override string ToString()
+     {
+-        return $"{(TailInward ? "↩ " : "")}꼬리 ({X:0}, {Y:0})";
++        return $"{(ThoughtTail ? "○ " : TailInward ? "↩ " : "")}꼬리 ({X:0}, {Y:0})";
+     }
+ }
+ 
+diff --git a/src/Models/ProjectData.cs b/src/Models/ProjectData.cs
+index 5e706c3..4bd7fa5 100644
+--- a/src/Models/ProjectData.cs
++++ b/src/Models/ProjectData.cs
+@@ -220,6 +220,8 @@ public sealed class SpeechBubbleData
+     public double ShapeIrregularity { get; set; } = 50;
+     // 폭 불규칙도(0~100, 구름/폭발 전용). 0/미지정이면 효과 없음.
+     public double ShapeWidthVariation { get; set; }
++    // 속도선 양쪽 페이드(양 끝 모두 투명). 0/미지정(구버전)이면 한쪽만 페이드.
++    public bool LineFadeBothSides { get; set; }
+     // 모서리 조절(사변형 일그러뜨림) 변위 TL,TR,BR,BL × X,Y = 8개. 0이면 일그러짐 없음.
+     public double[] CornerOffsets { get; set; } = new double[8];
+     // 모서리 조절을 도형/글자에 적용할지(개별).
+@@ -245,6 +247,8 @@ public sealed class BubbleTailData
+     public double Y { get; set; } = 130;
+     public double Width { get; set; } = 28;
+     public bool TailInward { get; set; }
++    // 생각 말풍선 꼬리(원 3개). 0/미지정(구버전)이면 일반 곡선 꼬리.
++    public bool ThoughtTail { get; set; }
+ }
+ 
+ public sealed class WindowSettings

@@ -1,0 +1,26 @@
+node_modules
+.DS_Store
+dist
+build
+.react-router
+.turbo
+*.log
+.env
+.vite
+
+# MCP 서버 스모크/데모 산출물
+.mcp-smoke.*
+
+# 저작 결과물(문서·이미지 번들) — 콘텐츠라 코드 리포에 커밋하지 않음
+*.koma.json
+*.kfjson
+
+# 파이프라인 생성 에피소드(계획·이미지·번들) — 산출물이라 커밋하지 않음
+episodes/
+
+# design-sync (변환 스크립트/번들/캐시 — 산출물은 무시, .design-sync/{config.json,NOTES.md,conventions.md,previews,overrides}만 커밋)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

@@ -1,0 +1,19 @@
+{
+  "source": "https://github.com/unknowndevdot/KomaForge",
+  "author": "unknowndevdot (흑우)",
+  "license": "PolyForm Noncommercial License 1.0.0",
+  "pinnedTag": "v0.1.5",
+  "pinnedCommit": "9eddda943feebc6056e6b9c02d12acad09658fe2",
+  "pinnedDate": "2026-06-27",
+  "fetchedAt": "2026-07-08",
+  "vendoredPath": "upstream/KomaForge",
+  "note": "읽기 전용 참조 스냅샷. 절대 직접 수정하지 말 것. 갱신은 upstream/sync.sh 로만.",
+  "knownTags": [
+    { "tag": "v0.1.0", "date": "2026-06-13", "summary": ".gitattributes + csproj 메타데이터" },
+    { "tag": "v0.1.1", "date": "2026-06-14", "summary": "움직이는 WebP 내보내기 + 내보내기 개편(형식·진행률·MF 프레임 추출) + ShapeWidthVariation" },
+    { "tag": "v0.1.2", "date": "2026-06-18", "summary": "WarpShape/WarpText(모서리 워프) + FlowText 도입 + 창 제목 버전" },
+    { "tag": "v0.1.3", "date": "2026-06-21", "summary": "Visual Novel 모드(VisualNovel.cs + DefaultVnTemplate) + 버전 표기 단일화" },
+    { "tag": "v0.1.4", "date": "2026-06-25", "summary": "말풍선 텍스트 회전 + RoundRect 캡슐 블렌딩 + 텍스트 잘림 수정" },
+    { "tag": "v0.1.5", "date": "2026-06-27", "summary": "속도선 양쪽 페이드 + 생각 꼬리(원 3개) + 꼬리 기본 배치/굵기 개선" }
+  ]
+}

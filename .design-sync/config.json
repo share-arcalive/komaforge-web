@@ -1,0 +1,9 @@
+{
+  "pkg": "@repo/ui",
+  "globalName": "KomaForgeUI",
+  "projectId": "3e0e29f6-1de4-4ae8-80a1-6352cb9a9ecc",
+  "shape": "package",
+  "buildCmd": "pnpm --filter @repo/ui build",
+  "cssEntry": "dist/styles.css",
+  "readmeHeader": ".design-sync/conventions.md"
+}

@@ -1,0 +1,2542 @@
+diff --git a/KomaForge.csproj b/KomaForge.csproj
+index 14f621b..ec6b596 100644
+--- a/KomaForge.csproj
++++ b/KomaForge.csproj
+@@ -6,7 +6,7 @@
+     <ImplicitUsings>enable</ImplicitUsings>
+     <UseWPF>true</UseWPF>
+     <ApplicationIcon />
+-    <Version>0.1.2</Version>
++    <Version>0.1.3</Version>
+     <Product>KomaForge</Product>
+     <Description>망가 페이지 에디터</Description>
+     <Authors>unknowndevdot</Authors>
+@@ -21,4 +21,8 @@
+     <PackageReference Include="Magick.NET-Q8-x64" Version="14.14.0" />
+     <PackageReference Include="SkiaSharp" Version="2.88.8" />
+   </ItemGroup>
++  <ItemGroup>
++    <!-- 비주얼 노벨 모드 진입 시 템플릿이 없으면 생성하는 기본 템플릿('이름'·'서술' 말풍선). -->
++    <EmbeddedResource Include="Resources\DefaultVnTemplate.json" />
++  </ItemGroup>
+ </Project>
+diff --git a/MainWindow.xaml b/MainWindow.xaml
+index bb4a41b..fcbb472 100644
+--- a/MainWindow.xaml
++++ b/MainWindow.xaml
+@@ -1,7 +1,7 @@
+ <Window x:Class="KomaForge.MainWindow"
+         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+-        Title="KomaForge v0.1.2 - Comic Layout"
++        Title="KomaForge - Comic Layout"
+         Width="1280"
+         Height="820"
+         MinWidth="980"
+@@ -70,67 +70,37 @@
+                              TextChanged="ComicTitleTextBox_TextChanged"
+                              Margin="0,0,0,12" />
+ 
+-                    <!-- 텍스트 모드 토글은 인스펙터에 노출하지 않는다(메뉴 '새로 만들기(텍스트 템플릿)'·프로젝트 불러오기로 결정).
++                    <!-- 비주얼 노벨 모드 토글은 인스펙터에 노출하지 않는다(단축키 Ctrl+T로 켜고 끔).
+                          컨트롤은 섹션 표시/숨김 로직을 위해 그대로 두되 화면에는 보이지 않게 Collapsed. -->
+                     <CheckBox x:Name="FlowTextModeCheckBox"
+-                              Content="텍스트 모드 (여러 페이지에 본문 흐름)"
++                              Content="비주얼 노벨 모드 (여러 페이지에 본문 흐름)"
+                               Visibility="Collapsed"
+                               Margin="0,0,0,12"
+                               Checked="FlowTextModeCheckBox_Changed"
+                               Unchecked="FlowTextModeCheckBox_Changed" />
+ 
+-                    <Border x:Name="FlowTextSectionBorder" Style="{StaticResource InspectorSection}" Visibility="Collapsed">
++                    <Border x:Name="VnSectionBorder" Style="{StaticResource InspectorSection}" Visibility="Collapsed">
+                     <StackPanel>
+-                    <TextBlock Text="텍스트 (여러 페이지에 흐름)" Style="{StaticResource SectionHeader}" />
+-                    <TextBlock Text="구간을 선택한 뒤 글꼴·글자색·아웃라인색을 바꾸면 그 부분만 적용됩니다(선택이 없으면 전체)."
++                    <TextBlock Text="비주얼 노벨 생성" Style="{StaticResource SectionHeader}" />
++                    <TextBlock Text="스크립트(한 줄 = 한 페이지). '이름: 대사' 형식, 이름 없는 줄은 서술로 처리됩니다."
+                                TextWrapping="Wrap" FontSize="11" Foreground="#8A8479" Margin="0,0,0,6" />
+-                    <TextBox x:Name="FlowTextBox"
++                    <TextBox x:Name="VnScriptBox"
+                              AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                              VerticalScrollBarVisibility="Auto" Height="120"
+-                             Padding="6,4" Margin="0,0,0,8"
+-                             IsInactiveSelectionHighlightEnabled="True"
+-                             TextChanged="FlowTextBox_TextChanged" />
+-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="글꼴" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
+-                        <ComboBox x:Name="FlowFontFamilyComboBox" Width="130" MaxDropDownHeight="320" SelectionChanged="FlowFontFamilyComboBox_SelectionChanged" />
+-                    </StackPanel>
+-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="크기" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
+-                        <TextBox x:Name="FlowFontSizeBox" Width="60" Text="20" Padding="6,2" VerticalContentAlignment="Center" TextChanged="FlowStyleBox_Changed" />
+-                        <TextBlock Text="줄간격" VerticalAlignment="Center" Margin="12,0,6,0" Foreground="#55514A" />
+-                        <TextBox x:Name="FlowLineHeightBox" Width="48" Text="30" Padding="6,2" VerticalContentAlignment="Center" TextChanged="FlowStyleBox_Changed" ToolTip="0이면 자동" />
+-                    </StackPanel>
+-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="정렬" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
+-                        <ComboBox x:Name="FlowAlignmentComboBox" Width="130" SelectionChanged="FlowAlignmentComboBox_SelectionChanged">
+-                            <ComboBoxItem Content="왼쪽" Tag="Left" />
+-                            <ComboBoxItem Content="가운데" Tag="Center" />
+-                            <ComboBoxItem Content="오른쪽" Tag="Right" />
+-                            <ComboBoxItem Content="양쪽" Tag="Justify" IsSelected="True" />
+-                        </ComboBox>
+-                    </StackPanel>
+-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="글자색" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
+-                        <ComboBox x:Name="FlowColorComboBox" Width="130" SelectionChanged="FlowColorComboBox_SelectionChanged" />
+-                    </StackPanel>
+-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="아웃라인색" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
+-                        <ComboBox x:Name="FlowOutlineColorComboBox" Width="130" SelectionChanged="FlowOutlineColorComboBox_SelectionChanged" ToolTip="'없음'이면 외곽선 없음" />
+-                    </StackPanel>
+-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+-                        <TextBlock Text="뒷배경색" Width="64" VerticalAlignment="Center" Foreground="#55514A" />
+-                        <ComboBox x:Name="FlowBackdropColorComboBox" Width="130" SelectionChanged="FlowBackdropColorComboBox_SelectionChanged" ToolTip="페이지 뒤에 깔리는 색. 페이지 배경을 투명으로 하면 이 색이 보입니다. '없음'이면 투명." />
+-                    </StackPanel>
+-                    <TextBlock Text="여백 (좌·상·우·하)" Foreground="#55514A" Margin="0,0,0,4" />
+-                    <UniformGrid Rows="1" Columns="4">
+-                        <TextBox x:Name="FlowMarginLeftBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,4,0" TextChanged="FlowStyleBox_Changed" />
+-                        <TextBox x:Name="FlowMarginTopBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,4,0" TextChanged="FlowStyleBox_Changed" />
+-                        <TextBox x:Name="FlowMarginRightBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,4,0" TextChanged="FlowStyleBox_Changed" />
+-                        <TextBox x:Name="FlowMarginBottomBox" Text="30" Padding="6,2" VerticalContentAlignment="Center" Margin="0" TextChanged="FlowStyleBox_Changed" />
++                             Padding="6,4" Margin="0,0,0,8" />
++                    <TextBlock Text="템플릿 페이지 (생성 시 복제할 페이지)" Foreground="#55514A" Margin="0,0,0,4" />
++                    <ListBox x:Name="VnTemplateListBox"
++                             MinHeight="56" MaxHeight="120"
++                             DisplayMemberPath="Name"
++                             SelectionChanged="VnTemplateListBox_SelectionChanged"
++                             Margin="0,0,0,6" />
++                    <UniformGrid Rows="1" Columns="2" Margin="0,0,0,8">
++                        <Button Content="템플릿 복제" Click="VnAddTemplate_Click" Margin="0,0,4,0"
++                                ToolTip="템플릿을 선택 중이면 그 템플릿을, 아니면 현재 일반 페이지를 복제해 템플릿 목록에 추가합니다." />
++                        <Button Content="템플릿 삭제" Click="VnDeleteTemplate_Click" Margin="0" />
+                     </UniformGrid>
+-                    <Button Content="텍스트 길이에 맞춰 페이지 생성 및 삭제" Margin="0,12,0,0" Padding="8,5"
+-                            Click="FitPagesToFlowText_Click"
+-                            ToolTip="본문이 모두 보이도록 페이지 수를 자동으로 맞춥니다(부족하면 추가, 남으면 삭제)." />
++                    <Button Content="생성" Click="VnGenerate_Click" Padding="8,5" Margin="0"
++                            ToolTip="스크립트 각 줄마다 선택한 템플릿을 복제하고 '이름'/'서술' 말풍선을 줄 내용으로 교체해 페이지를 만듭니다." />
+                     </StackPanel>
+                     </Border>
+ 
+@@ -142,7 +112,6 @@
+                     <ListBox x:Name="PageListBox"
+                              MinHeight="86"
+                              MaxHeight="150"
+-                             AlternationCount="10000"
+                              SelectionChanged="PageListBox_SelectionChanged"
+                              MouseDoubleClick="PageListBox_MouseDoubleClick"
+                              PreviewKeyDown="PageListBox_PreviewKeyDown"
+@@ -161,9 +130,10 @@
+                                                 </Style.Triggers>
+                                             </Style>
+                                         </StackPanel.Style>
+-                                        <TextBlock Text="{Binding (ItemsControl.AlternationIndex), RelativeSource={RelativeSource AncestorType=ListBoxItem}, Converter={StaticResource AddOneConverter}}" />
++                                        <TextBlock Text="{Binding DisplayIndex}" />
+                                         <TextBlock Text=". " />
+-                                        <TextBlock Text="{Binding Name}" />
++                                        <!-- 비주얼 노벨 모드면 말풍선 텍스트 요약, 아니면 페이지 이름(DisplayLabel) -->
++                                        <TextBlock Text="{Binding DisplayLabel}" TextTrimming="CharacterEllipsis" />
+                                     </StackPanel>
+                                     <!-- 편집: 더블클릭/F2 시 표시되는 입력칸(기본 숨김은 Style로 — 로컬 값은 트리거를 덮어쓰므로). -->
+                                     <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+@@ -186,10 +156,13 @@
+                             </DataTemplate>
+                         </ListBox.ItemTemplate>
+                     </ListBox>
+-                    <UniformGrid Rows="1" Columns="4" Margin="0,0,0,18">
++                    <UniformGrid Rows="1" Columns="5" Margin="0,0,0,18">
+                         <Button Content="추가"
+                                 Click="AddPage_Click"
+                                 Margin="0,0,4,0" />
++                        <Button Content="복제"
++                                Click="DuplicatePage_Click"
++                                Margin="0,0,4,0" />
+                         <Button Content="삭제"
+                                 Click="DeletePage_Click"
+                                 Margin="0,0,4,0" />
+@@ -638,6 +611,8 @@
+                              AcceptsReturn="True"
+                              TextWrapping="Wrap"
+                              MinHeight="74"
++                             MaxHeight="200"
++                             VerticalScrollBarVisibility="Auto"
+                              Padding="8"
+                              IsInactiveSelectionHighlightEnabled="True"
+                              ToolTip="구간을 선택한 뒤 글자색·아웃라인색·글꼴을 바꾸면 그 부분만 적용됩니다(선택이 없으면 전체)."
+@@ -919,12 +894,6 @@
+                                 Width="832"
+                                 Height="1216"
+                                 ClipToBounds="True" />
+-                        <!-- 여러 페이지에 흘려 보여줄 본문 텍스트(칸·이미지 위, 클릭은 통과). -->
+-                        <Grid x:Name="FlowTextLayer"
+-                              Width="832"
+-                              Height="1216"
+-                              ClipToBounds="True"
+-                              IsHitTestVisible="False" />
+                         <Canvas x:Name="PageOverlay"
+                                 Width="832"
+                                 Height="1216"
+diff --git a/MainWindow.xaml.cs b/MainWindow.xaml.cs
+index 4be22ee..f33864a 100644
+--- a/MainWindow.xaml.cs
++++ b/MainWindow.xaml.cs
+@@ -57,6 +57,9 @@ public partial class MainWindow : Window
+         public List<string> PageJsons = new();
+         // 프로젝트 전체 본문 텍스트(노벨 뷰어)의 직렬화 JSON. 페이지와 무관한 단일 객체.
+         public string FlowJson = "{}";
++        // 비주얼 노벨 템플릿 목록 JSON과, 그 시점에 편집 중이던 템플릿 인덱스(-1이면 일반 페이지 편집).
++        public string VnTemplatesJson = "[]";
++        public int VnEditingIndex = -1;
+     }
+ 
+     private readonly List<ComicPanel> _panels = new();
+@@ -94,6 +97,12 @@ public partial class MainWindow : Window
+     // 페이지 목록(PageListBox.ItemsSource로 바인딩). ObservableCollection이라 추가/삭제/이동이
+     // 목록 전체 재구성 없이 '바뀐 항목만' 증분 갱신된다(스크롤·선택 보존, 페이지 수와 무관한 비용).
+     private readonly ObservableCollection<ComicPageData> _pages = new();
++    // 비주얼 노벨 생성용 템플릿 페이지(일반 페이지와 별개, VN 섹션 목록에 바인딩).
++    private readonly ObservableCollection<ComicPageData> _vnTemplates = new();
++    // null이면 일반 페이지를 편집 중, 아니면 이 VN 템플릿을 캔버스에서 편집 중(SaveCurrentPageState가 여기로 저장).
++    private ComicPageData? _editingTemplate;
++    // 일반 페이지 목록 ↔ VN 템플릿 목록 선택 동기화 중 재진입 방지.
++    private bool _isSwitchingEditTarget;
+     private int _currentPageIndex;
+     private string? _projectBaseDirectory;
+     // 현재 불러왔거나 저장한 프로젝트 파일 전체 경로(Ctrl+S 덮어쓰기 대상). 없으면 다른 이름으로 저장.
+@@ -155,7 +164,7 @@ public partial class MainWindow : Window
+         RefreshShortcutMenuText(); // 메뉴의 단축키 표기를 현재 설정으로 맞춘다
+         InitColorCombos(); // 팔레트 + 최근색 + '직접 지정…' 으로 색 콤보 구성(LoadWindowSettings 이후라 최근색 반영).
+         InitBubbleFontCombo(); // 시스템 글꼴 목록으로 말풍선 글꼴 콤보 구성.
+-        InitFlowFontCombo();   // 시스템 글꼴 목록으로 본문 텍스트 글꼴 콤보 구성.
++        VnTemplateListBox.ItemsSource = _vnTemplates; // 비주얼 노벨 템플릿 목록 바인딩.
+         _flowReady = true;     // 모든 컨트롤이 만들어졌으므로 본문 텍스트 핸들러를 활성화.
+         Closing += (_, _) =>
+         {
+@@ -175,6 +184,7 @@ public partial class MainWindow : Window
+         TryLoadAutosave();
+         UpdatePageList();
+         UpdateInspectorLabels();
++        UpdateWindowTitle(); // 시작 시 제목을 버전 포함으로 세팅(XAML 기본 제목 대체).
+ 
+         // 히스토리 초기화: 현재 상태를 기준선으로 삼고, 변화 감지 타이머를 돌린다.
+         ResetHistoryBaseline();
+@@ -219,7 +229,7 @@ public partial class MainWindow : Window
+             UpdateHoverTooltip(Mouse.DirectlyOver as DependencyObject);
+         }
+ 
+-        // 사용자 지정 가능한 명령 단축키(불러오기/저장/실행취소·다시실행/잘라내기·복사·붙여넣기/리셋/잠금/텍스트 모드).
++        // 사용자 지정 가능한 명령 단축키(불러오기/저장/실행취소·다시실행/잘라내기·복사·붙여넣기/리셋/잠금/비주얼 노벨 모드).
+         if (TryRunCustomShortcut(e))
+         {
+             e.Handled = true;
+@@ -339,7 +349,9 @@ public partial class MainWindow : Window
+ 
+     private void PageListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+     {
+-        if (_isUpdatingPageList || PageListBox.SelectedIndex < 0 || PageListBox.SelectedIndex == _currentPageIndex)
++        // 템플릿 편집 중이면 같은 인덱스를 골라도 일반 페이지 편집으로 복귀해야 하므로 인덱스 동일 가드는 그때 건너뛴다.
++        if (_isUpdatingPageList || PageListBox.SelectedIndex < 0
++            || (_editingTemplate == null && PageListBox.SelectedIndex == _currentPageIndex))
+         {
+             return;
+         }
+@@ -348,7 +360,11 @@ public partial class MainWindow : Window
+         var fromClick = Mouse.LeftButton == MouseButtonState.Pressed
+             || (PageSectionBorder != null && PageSectionBorder.IsKeyboardFocusWithin);
+ 
+-        SaveCurrentPageState();
++        SaveCurrentPageState();          // 직전 편집 대상(일반 페이지 또는 템플릿) 저장.
++        _editingTemplate = null;         // 일반 페이지 편집으로 복귀.
++        _isSwitchingEditTarget = true;
++        VnTemplateListBox.SelectedIndex = -1; // VN 템플릿 선택 해제.
++        _isSwitchingEditTarget = false;
+         _currentPageIndex = PageListBox.SelectedIndex;
+         LoadPage(_pages[_currentPageIndex]);
+         UpdateStatus($"{_pages[_currentPageIndex].Name} 페이지를 열었습니다.");
+@@ -526,22 +542,52 @@ public partial class MainWindow : Window
+         _historyDirty = true;
+     }
+ 
++    // 추가: 현재 페이지 아래에 기본 칸 구성의 새 페이지를 만든다(현재 페이지 크기만 따름, 내용 복사 없음).
+     private void AddPage_Click(object sender, RoutedEventArgs e)
+     {
++        LeaveTemplateEditing(); // 템플릿 편집 중이었다면 일반 페이지 편집으로 복귀 후 진행.
+         SaveCurrentPageState();
+         _historyStructuralPending = true; // 페이지 추가: 다음 캡처에서 전체 재직렬화.
+-        _pages.Add(new ComicPageData { Name = $"Page {_pages.Count + 1}", PageWidth = _pageWidth, PageHeight = _pageHeight });
+-        _currentPageIndex = _pages.Count - 1;
++
++        var insertAt = (_currentPageIndex >= 0 && _currentPageIndex < _pages.Count) ? _currentPageIndex + 1 : _pages.Count;
++        _pages.Insert(insertAt, new ComicPageData { Name = $"Page {_pages.Count + 1}", PageWidth = _pageWidth, PageHeight = _pageHeight });
++        _currentPageIndex = insertAt;
+         LoadPage(_pages[_currentPageIndex]);
+-        // 새 페이지를 기본 칸 구성으로 자동 채운다(패턴이 비어 있으면 빈 페이지 유지).
+-        CreateLayoutFromPattern(LayoutPatternTextBox.Text);
++        CreateLayoutFromPattern(LayoutPatternTextBox.Text); // 기본 칸 구성으로 채운다(패턴이 비어 있으면 빈 페이지).
+         ClearSelection();
+         UpdatePageList();
+-        UpdateStatus("새 페이지를 기본 칸 구성으로 추가했습니다.");
++        UpdateStatus("새 페이지를 추가했습니다.");
++    }
++
++    // 복제: 현재 페이지를 바로 아래에 통째로 복제한다(크기·배경·칸·내용 등 모든 설정).
++    private void DuplicatePage_Click(object sender, RoutedEventArgs e)
++    {
++        LeaveTemplateEditing(); // 템플릿 편집 중이었다면 일반 페이지 편집으로 복귀 후 진행.
++        if (_currentPageIndex < 0 || _currentPageIndex >= _pages.Count)
++        {
++            AddPage_Click(sender, e); // 복제할 현재 페이지가 없으면 단순 추가.
++            return;
++        }
++
++        SaveCurrentPageState();
++        _historyStructuralPending = true;
++
++        // JSON 왕복으로 깊은 복사해 페이지끼리 데이터를 공유하지 않게 한다.
++        var src = _pages[_currentPageIndex];
++        var clone = JsonSerializer.Deserialize<ComicPageData>(JsonSerializer.Serialize(src))!;
++        clone.Name = $"Page {_pages.Count + 1}"; // 순번만 늘린다('복사' 누적 방지).
++        var insertAt = _currentPageIndex + 1;
++        _pages.Insert(insertAt, clone);
++        _currentPageIndex = insertAt;
++        LoadPage(_pages[_currentPageIndex]);
++        ClearSelection();
++        UpdatePageList();
++        UpdateStatus("현재 페이지를 아래에 복제했습니다.");
+     }
+ 
+     private void DeletePage_Click(object sender, RoutedEventArgs e)
+     {
++        LeaveTemplateEditing(); // 템플릿 편집 중이었다면 일반 페이지 편집으로 복귀 후 진행.
+         if (_pages.Count <= 1)
+         {
+             UpdateStatus("페이지는 최소 1개가 필요합니다.");
+@@ -568,6 +614,7 @@ public partial class MainWindow : Window
+ 
+     private void MoveCurrentPage(int direction)
+     {
++        LeaveTemplateEditing(); // 템플릿 편집 중이었다면 일반 페이지 편집으로 복귀 후 진행.
+         var target = _currentPageIndex + direction;
+         if (_currentPageIndex < 0 || target < 0 || target >= _pages.Count)
+         {
+@@ -612,7 +659,6 @@ public partial class MainWindow : Window
+     {
+         var newW = Math.Clamp(width, 100, 5000);
+         var newH = Math.Clamp(height, 100, 5000);
+-        var sizeChanged = newW != _pageWidth || newH != _pageHeight;
+         _pageWidth = newW;
+         _pageHeight = newH;
+ 
+@@ -622,8 +668,6 @@ public partial class MainWindow : Window
+         PanelCanvas.Height = _pageHeight;
+         PageOverlay.Width = _pageWidth;
+         PageOverlay.Height = _pageHeight;
+-        FlowTextLayer.Width = _pageWidth;
+-        FlowTextLayer.Height = _pageHeight;
+ 
+         if (updateTextBoxes)
+         {
+@@ -633,11 +677,6 @@ public partial class MainWindow : Window
+             _isLoadingInspector = false;
+         }
+ 
+-        // 페이지 크기가 바뀐 경우에만 본문 분할을 다시 계산한다(페이지 전환 시 불필요한 재분할 회피).
+-        if (sizeChanged)
+-        {
+-            RebuildFlowDocument();
+-        }
+         UpdatePageFit();
+     }
+ 
+@@ -663,6 +702,13 @@ public partial class MainWindow : Window
+         _updatingFitMenu = false;
+ 
+         UpdatePageFit();
++
++        // 보기 설정은 토글 즉시 저장한다(강제 종료·크래시로 닫혀도 유실되지 않도록).
++        // 단, 불러오기 도중 메뉴를 세팅할 때는 저장하지 않는다(절반만 로드된 상태 저장 방지).
++        if (!_loadingWindowSettings)
++        {
++            SaveWindowSettings();
++        }
+     }
+ 
+     private void PageBackgroundColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+@@ -679,14 +725,15 @@ public partial class MainWindow : Window
+     // 페이지 배경을 선택한 색으로 적용한다(내보내기 결과 배경에도 반영됨).
+     private void ApplyPageBackground()
+     {
++        var brush = new SolidColorBrush(CurrentPageBackgroundColor());
+         if (PageSurface != null)
+         {
+-            PageSurface.Background = new SolidColorBrush(CurrentPageBackgroundColor());
++            PageSurface.Background = brush;
++        }
++        if (PageFrame != null)
++        {
++            PageFrame.Background = brush; // 페이지 뒤 레이어도 페이지 색으로(1px 테두리 오프셋 메움).
+         }
+-
+-        // PageFrame(페이지 뒤 레이어)은 ApplyBackdrop이 단독으로 정한다:
+-        // 텍스트 모드 ON이면 뒷배경색, OFF면 페이지 색(기존 동작). 페이지 전환 시에도 일관되게 유지.
+-        ApplyBackdrop();
+     }
+ 
+     private void ToggleInspector_Click(object sender, RoutedEventArgs e)
+@@ -718,6 +765,15 @@ public partial class MainWindow : Window
+ 
+     private void PageScrollViewer_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+     {
++        // 선택된 이미지가 칸 밖으로 벗어난 경우: 그 벗어난 부분(칸 프레임 밖)을 눌러도 드래그로 이동할 수 있게 한다.
++        // (칸 프레임 밖이라 프레임의 다운 핸들러가 닿지 않으므로 여기서 가로채 처리한다.)
++        if (ShouldBeginOverflowImageDrag(e))
++        {
++            BeginOverflowImageDrag(e);
++            e.Handled = true;
++            return;
++        }
++
+         // 페이지(PageSurface) 밖 — 스크롤뷰어 여백 — 을 클릭하면 선택 해제.
+         if (!IsInspectorOpen()) return; // 뷰어 모드에서는 어차피 선택이 없다.
+         var node = e.OriginalSource as DependencyObject;
+@@ -739,6 +795,13 @@ public partial class MainWindow : Window
+             return;
+         }
+ 
++        // 이미지가 선택돼 있으면 커서 위치와 무관하게(이미지 위에 올릴 필요 없이) 휠로 이미지 크기를 조절한다.
++        if (_selectionKind == SelectionKind.Image && _selectedImage != null)
++        {
++            ZoomImage(_selectedImage, e);
++            return;
++        }
++
+         // 편집 모드라도 커서가 페이지 바깥(여백)에 있으면 휠로 페이지를 넘긴다.
+         if (PageSurface != null && !IsMouseOverElement(PageSurface, e))
+         {
+@@ -758,14 +821,6 @@ public partial class MainWindow : Window
+             return;
+         }
+ 
+-        // 선택된 이미지가 속한 칸 영역 위에서 휠 → 이미지 크기.
+-        if (_selectionKind == SelectionKind.Image && _selectedImage != null &&
+-            IsMouseOverElement(_selectedImage.OwnerPanel.Frame, e))
+-        {
+-            ZoomImage(_selectedImage, e);
+-            return;
+-        }
+-
+         // 그 외(선택 안 됨 등): 윈도우 휠 설정에 맞춰 세로 스크롤(WPF 기본은 설정을 무시하므로 직접 처리).
+         if (PageScrollViewer.ScrollableHeight > 0)
+         {
+@@ -834,11 +889,51 @@ public partial class MainWindow : Window
+     // 터널링 단계에서 인스펙터 ScrollViewer를 직접 스크롤한다(윈도우 휠 설정 반영).
+     private void InspectorScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+     {
++        // 커서 아래에 자체 스크롤 가능한 내부 스크롤뷰어(리스트/여러 줄 텍스트박스)가 있고 그 방향으로 더
++        // 스크롤할 수 있으면, 그 컨트롤을 '한 번에 최대 한 화면'으로 제한해 직접 스크롤한다(휠이 너무 많이 넘어가지 않게).
++        var inner = FindScrollableInner(e.OriginalSource as DependencyObject, e.Delta);
++        if (inner != null)
++        {
++            ScrollViewerByNotch(inner, e.Delta);
++            e.Handled = true;
++            return;
++        }
++
+         InspectorScrollViewer.ScrollToVerticalOffset(
+             InspectorScrollViewer.VerticalOffset - WheelScrollPixels(InspectorScrollViewer, e.Delta));
+         e.Handled = true;
+     }
+ 
++    // OriginalSource에서 InspectorScrollViewer까지 거슬러 올라가며, 휠 방향으로 더 스크롤 가능한
++    // 내부 스크롤뷰어(리스트·텍스트박스의 내부 ScrollViewer)를 찾는다.
++    private ScrollViewer? FindScrollableInner(DependencyObject? src, int delta)
++    {
++        while (src != null && !ReferenceEquals(src, InspectorScrollViewer))
++        {
++            if (src is ScrollViewer sv && !ReferenceEquals(sv, InspectorScrollViewer)
++                && sv.ScrollableHeight > 0.5
++                && (delta > 0 ? sv.VerticalOffset > 0.5 : sv.VerticalOffset < sv.ScrollableHeight - 0.5))
++            {
++                return sv;
++            }
++            src = src is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(src) : null;
++        }
++        return null;
++    }
++
++    // 휠 한 칸당 스크롤량을 '한 화면(보이는 만큼)' 이하로 제한해 스크롤한다.
++    private static void ScrollViewerByNotch(ScrollViewer sv, int delta)
++    {
++        var notches = delta / 120.0;
++        var lines = SystemParameters.WheelScrollLines; // -1이면 '한 번에 한 화면'.
++        // 아이템 단위(CanContentScroll)면 ViewportHeight=아이템 수, 픽셀 단위면 줄당 약 16px.
++        var perNotch = lines < 0
++            ? sv.ViewportHeight
++            : (sv.CanContentScroll ? lines : lines * 16.0);
++        perNotch = System.Math.Min(perNotch, sv.ViewportHeight); // 한 번에 최대 한 화면.
++        sv.ScrollToVerticalOffset(sv.VerticalOffset - notches * perNotch);
++    }
++
+     private void Undo_Click(object sender, RoutedEventArgs e) => Undo();
+ 
+     private void Redo_Click(object sender, RoutedEventArgs e) => Redo();
+@@ -853,7 +948,9 @@ public partial class MainWindow : Window
+             // 이미지가 실행 파일 폴더(또는 하위)면 상대 경로로, 아니면 절대 경로로 저장한다.
+             // → 실행 파일·자동저장을 이미지와 함께 옮겨도 다음 실행 때 그대로 열린다.
+             Pages = CaptureProjectPages(null),
+-            FlowText = _flow.Clone()
++            FlowText = _flow.Clone(),
++            VnTemplates = _vnTemplates.Select(t => CopyPageForStorage(t, null)).ToList(),
++            VnEditingIndex = _editingTemplate != null ? _vnTemplates.IndexOf(_editingTemplate) : -1
+         };
+         return JsonSerializer.Serialize(project);
+     }
+@@ -903,9 +1000,31 @@ public partial class MainWindow : Window
+         }
+ 
+         ComicTitleTextBox.Text = project.Title;
+-        ReplacePages(project.Pages);
++        ReplacePages(project.Pages); // _editingTemplate = null로 초기화됨.
++        // VN 템플릿 복원(자동저장·실행취소 JSON 모두 VnTemplates를 포함하므로 그대로 교체).
++        _vnTemplates.Clear();
++        foreach (var t in project.VnTemplates)
++        {
++            _vnTemplates.Add(t);
++        }
++
+         _currentPageIndex = Math.Clamp(project.CurrentPageIndex, 0, _pages.Count - 1);
+-        LoadPage(_pages[_currentPageIndex]);
++
++        // 편집 대상 복원: 스냅샷이 템플릿 편집 중이었다면 그 템플릿을 캔버스로 연다.
++        if (project.VnEditingIndex >= 0 && project.VnEditingIndex < _vnTemplates.Count)
++        {
++            _editingTemplate = _vnTemplates[project.VnEditingIndex];
++            LoadPage(_editingTemplate);
++            _isSwitchingEditTarget = true;
++            VnTemplateListBox.SelectedIndex = project.VnEditingIndex;
++            PageListBox.SelectedIndex = -1;
++            _isSwitchingEditTarget = false;
++        }
++        else
++        {
++            LoadPage(_pages[_currentPageIndex]);
++        }
++
+         ApplyFlowText(project.FlowText); // 본문 텍스트·서식 복원(실행취소/자동저장 포함).
+         UpdatePageList();
+     }
+@@ -933,7 +1052,9 @@ public partial class MainWindow : Window
+             Title = ComicTitleTextBox.Text.Trim(),
+             CurrentIndex = _currentPageIndex,
+             PageJsons = new List<string>(_pages.Count),
+-            FlowJson = JsonSerializer.Serialize(_flow)
++            FlowJson = JsonSerializer.Serialize(_flow),
++            VnTemplatesJson = JsonSerializer.Serialize(_vnTemplates.Select(t => CopyPageForStorage(t, null)).ToList()),
++            VnEditingIndex = _editingTemplate != null ? _vnTemplates.IndexOf(_editingTemplate) : -1
+         };
+ 
+         var full = forceFull || _baseline == null || _historyStructuralPending
+@@ -960,12 +1081,14 @@ public partial class MainWindow : Window
+ 
+     // 스냅샷(페이지별 JSON)을 RestoreSnapshot이 읽는 전체 프로젝트 JSON으로 조립한다.
+     // 페이지 JSON은 이미 만들어져 있으므로 문자열 연결만으로 끝난다(재직렬화 없음).
+-    private static string AssembleFullJson(HistorySnapshot snapshot)
++    private string AssembleFullJson(HistorySnapshot snapshot)
+     {
+         var pages = string.Join(",", snapshot.PageJsons);
+         var title = JsonSerializer.Serialize(snapshot.Title); // 따옴표·이스케이프 포함
+         var flow = string.IsNullOrEmpty(snapshot.FlowJson) ? "{}" : snapshot.FlowJson;
+-        return $"{{\"Title\":{title},\"CurrentPageIndex\":{snapshot.CurrentIndex},\"Pages\":[{pages}],\"FlowText\":{flow}}}";
++        // 스냅샷 시점의 템플릿·편집 대상까지 포함해야 실행취소/다시실행이 템플릿 편집도 되돌린다.
++        var templates = string.IsNullOrEmpty(snapshot.VnTemplatesJson) ? "[]" : snapshot.VnTemplatesJson;
++        return $"{{\"Title\":{title},\"CurrentPageIndex\":{snapshot.CurrentIndex},\"Pages\":[{pages}],\"FlowText\":{flow},\"VnTemplates\":{templates},\"VnEditingIndex\":{snapshot.VnEditingIndex}}}";
+     }
+ 
+     // 변화 감지용 경량 서명. 편집은 현재 페이지에서만 일어나므로, 전체가 아니라
+@@ -978,7 +1101,9 @@ public partial class MainWindow : Window
+         var current = _currentPageIndex >= 0 && _currentPageIndex < _pages.Count
+             ? JsonSerializer.Serialize(_pages[_currentPageIndex])
+             : string.Empty;
+-        return $"{ComicTitleTextBox.Text}|{_currentPageIndex}|{_pages.Count}|{names}|{current}|{JsonSerializer.Serialize(_flow)}";
++        // VN 템플릿 편집·추가·삭제·전환도 변화로 잡아 실행취소 경계를 만든다(템플릿은 보통 적어 비용 작음).
++        var vn = $"{(_editingTemplate != null ? _vnTemplates.IndexOf(_editingTemplate) : -1)}|{JsonSerializer.Serialize(_vnTemplates)}";
++        return $"{ComicTitleTextBox.Text}|{_currentPageIndex}|{_pages.Count}|{names}|{current}|{JsonSerializer.Serialize(_flow)}|{vn}";
+     }
+ 
+     // 마지막 기준선과 달라졌으면 변경분을 undo 스택에 쌓는다.
+@@ -1245,8 +1370,14 @@ public partial class MainWindow : Window
+         UpdateWindowTitle();
+     }
+ 
+-    // 앱 버전(창 제목 등에 표시).
+-    private const string AppVersion = "v0.1.2";
++    // 앱 버전(창 제목 등에 표시). csproj의 <Version> 한 곳에서 런타임에 읽는다(하드코딩 중복 제거).
++    private static readonly string AppVersion = ReadAppVersion();
++
++    private static string ReadAppVersion()
++    {
++        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
++        return v != null ? $"v{v.Major}.{v.Minor}.{v.Build}" : "v0.0.0";
++    }
+ 
+     private void UpdateWindowTitle()
+     {
+diff --git a/Resources/DefaultVnTemplate.json b/Resources/DefaultVnTemplate.json
+new file mode 100644
+index 0000000..56b5f9f
+--- /dev/null
++++ b/Resources/DefaultVnTemplate.json
+@@ -0,0 +1,141 @@
++{
++  "Name": "템플릿 1",
++  "PageWidth": 832,
++  "PageHeight": 832,
++  "BlackBackground": false,
++  "BackgroundColor": "#000000",
++  "Panels": [
++    {
++      "Number": 1,
++      "Id": "f09f4cb9bed4432d90c88da54fcbb472",
++      "Name": "",
++      "X": 0,
++      "Y": 0,
++      "Width": 832,
++      "Height": 832,
++      "IsLocked": false,
++      "CornerMode": false,
++      "BackgroundColor": "#000000",
++      "BorderColor": "#00FFFFFF",
++      "CornerOffsets": [
++        0,
++        0,
++        0,
++        0,
++        0,
++        0,
++        0,
++        0
++      ],
++      "Images": [],
++      "Bubbles": [
++        {
++          "Id": "4926cc2b3585424fb5673788f8b97b14",
++          "Text": "이름",
++          "X": 24,
++          "Y": 539,
++          "Width": 170,
++          "Height": 56,
++          "FontSize": 20,
++          "FontFamily": "Malgun Gothic",
++          "TextAlignment": "Center",
++          "VerticalAlignment": "Center",
++          "Runs": [
++            {
++              "Text": "이름",
++              "FontFamily": null,
++              "Color": null,
++              "OutlineColor": null
++            }
++          ],
++          "LineHeight": 0,
++          "TextMarginLeft": 0,
++          "TextMarginTop": 0,
++          "TextMarginRight": 0,
++          "TextMarginBottom": 0,
++          "IsCropped": false,
++          "IsLocked": false,
++          "HasTextOutline": false,
++          "FillColor": "#FFFFFF",
++          "StrokeColor": "#00FFFFFF",
++          "BackgroundColor": "#C8000000",
++          "BorderColor": "#868E96",
++          "Shape": "RoundRect",
++          "ShapeCount": 9,
++          "ShapeStrength": 100,
++          "ShapeIrregularity": 50,
++          "ShapeWidthVariation": 0,
++          "CornerOffsets": [
++            0,
++            0,
++            0,
++            0,
++            0,
++            0,
++            0,
++            0
++          ],
++          "WarpShape": false,
++          "WarpText": false,
++          "TailInward": false,
++          "PivotX": 0.5,
++          "PivotY": 0.5,
++          "Tails": []
++        },
++        {
++          "Id": "7fddbd42e843433aa9ce82759bf1a619",
++          "Text": "서술",
++          "X": 24,
++          "Y": 618.9370629370628,
++          "Width": 784,
++          "Height": 189.06293706293718,
++          "FontSize": 20,
++          "FontFamily": "Malgun Gothic",
++          "TextAlignment": "Left",
++          "VerticalAlignment": "Top",
++          "Runs": [
++            {
++              "Text": "서술",
++              "FontFamily": null,
++              "Color": null,
++              "OutlineColor": null
++            }
++          ],
++          "LineHeight": 0,
++          "TextMarginLeft": 32,
++          "TextMarginTop": 24,
++          "TextMarginRight": 32,
++          "TextMarginBottom": 24,
++          "IsCropped": false,
++          "IsLocked": false,
++          "HasTextOutline": false,
++          "FillColor": "#FFFFFF",
++          "StrokeColor": "#00FFFFFF",
++          "BackgroundColor": "#C8000000",
++          "BorderColor": "#868E96",
++          "Shape": "RoundRect",
++          "ShapeCount": 9,
++          "ShapeStrength": 100,
++          "ShapeIrregularity": 50,
++          "ShapeWidthVariation": 0,
++          "CornerOffsets": [
++            0,
++            0,
++            0,
++            0,
++            0,
++            0,
++            0,
++            0
++          ],
++          "WarpShape": false,
++          "WarpText": false,
++          "TailInward": false,
++          "PivotX": 0.5,
++          "PivotY": 0.5,
++          "Tails": []
++        }
++      ]
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/src/MainWindow/MainWindow.ColorPicker.cs b/src/MainWindow/MainWindow.ColorPicker.cs
+index 67b7026..80685c7 100644
+--- a/src/MainWindow/MainWindow.ColorPicker.cs
++++ b/src/MainWindow/MainWindow.ColorPicker.cs
+@@ -34,9 +34,6 @@ public partial class MainWindow
+         _colorCombos.Add((PanelBorderColorComboBox, true));      // 칸 테두리(없음=투명)
+         _colorCombos.Add((PageBackgroundColorComboBox, true));   // 페이지 배경(투명 포함 → 투명 내보내기)
+         _colorCombos.Add((BubbleBorderColorComboBox, false));    // 말풍선 테두리(단색)
+-        _colorCombos.Add((FlowColorComboBox, false));            // 본문 텍스트 색(단색)
+-        _colorCombos.Add((FlowOutlineColorComboBox, true));      // 본문 텍스트 아웃라인(없음=투명)
+-        _colorCombos.Add((FlowBackdropColorComboBox, true));     // 페이지 뒤 배경(없음=투명)
+ 
+         RebuildColorCombos();
+ 
+@@ -48,9 +45,6 @@ public partial class MainWindow
+         SelectComboColor(PanelBorderColorComboBox, "#000000");       // 기본 검정
+         SelectComboColor(PageBackgroundColorComboBox, "#FFFFFF");     // 기본 흰색
+         SelectComboColor(BubbleBorderColorComboBox, "#000000");      // 기본 검정
+-        SelectComboColor(FlowColorComboBox, "#FFFFFF");             // 기본 흰색
+-        SelectComboColor(FlowOutlineColorComboBox, "#000000");       // 기본 검정
+-        SelectComboColor(FlowBackdropColorComboBox, "#FFFFFF");      // 기본 흰색
+     }
+ 
+     // 모든 색 콤보를 [없음?]+[최근색]+[팔레트]+[직접 지정…] 순으로 다시 채운다(현재 선택은 유지).
+diff --git a/src/MainWindow/MainWindow.FlowText.cs b/src/MainWindow/MainWindow.FlowText.cs
+index d2e7ba0..40ed49d 100644
+--- a/src/MainWindow/MainWindow.FlowText.cs
++++ b/src/MainWindow/MainWindow.FlowText.cs
+@@ -1,327 +1,23 @@
+-using System.Text.Json;
+ using System.Windows;
+-using System.Windows.Controls;
+-using System.Windows.Documents;
+-using System.Windows.Media;
+ 
+ namespace KomaForge;
+ 
+ public partial class MainWindow : Window
+ {
+-    // 프로젝트 전체에 걸쳐 페이지별로 흘려 표시하는 본문 텍스트(노벨 뷰어). 칸·이미지 위 레이어.
++    // 비주얼 노벨 모드 상태. Enabled가 핵심이며(모드 ON/OFF), 나머지 옛 흐름텍스트 필드는 더 이상 UI가 없다.
+     private FlowTextData _flow = new();
+-    private FlowDocument? _flowDoc;
+-    private DocumentPaginator? _flowPaginator;
+-    private PageVisualHost? _flowHost;
+-    // 렌더 키색 → (실제 채움색, 아웃라인색) 매핑. 구간마다 고유 키색을 부여해 같은 글자색이라도
+-    // 아웃라인을 독립적으로 그룹·렌더한다(키색은 그리지 않으므로 화면에 안 보임). RebuildFlowDocument에서 갱신.
+-    private System.Collections.Generic.Dictionary<Color, (Color Fill, Color Outline)> _flowRenderMap = new();
+-    private bool _flowNeedOutline; // 불투명 아웃라인이 하나라도 있으면 그룹 경로로 렌더.
+ 
+-    // 분할된 한 페이지의 Visual을 그대로 호스팅하는 경량 요소(DocumentPageView가 public이 아니라 직접 구현).
+-    private sealed class PageVisualHost : FrameworkElement
+-    {
+-        private Visual? _child;
+-
+-        public void SetChild(Visual? v)
+-        {
+-            if (ReferenceEquals(_child, v))
+-            {
+-                return;
+-            }
+-            if (_child != null)
+-            {
+-                RemoveVisualChild(_child);
+-            }
+-            _child = v;
+-            if (_child != null)
+-            {
+-                AddVisualChild(_child);
+-            }
+-            InvalidateMeasure();
+-        }
+-
+-        protected override int VisualChildrenCount => _child == null ? 0 : 1;
+-        protected override Visual GetVisualChild(int index) => _child!;
+-    }
+-
+-    private void EnsureFlowHost()
+-    {
+-        if (_flowHost != null)
+-        {
+-            return;
+-        }
+-
+-        _flowHost = new PageVisualHost
+-        {
+-            IsHitTestVisible = false,
+-            HorizontalAlignment = HorizontalAlignment.Left,
+-            VerticalAlignment = VerticalAlignment.Top
+-        };
+-        FlowTextLayer.Children.Add(_flowHost);
+-    }
+-
+-    // _flow의 텍스트·서식·현재 페이지 크기로 FlowDocument를 만들어 '페이지 단위 분할'을 준비한다.
+-    // 텍스트·서식·페이지 크기가 바뀔 때만 호출(페이지 전환·추가/삭제 시엔 호출하지 않음 → 분할 재계산 회피).
+-    private void RebuildFlowDocument()
+-    {
+-        EnsureFlowHost();
+-
+-        if (!_flow.Enabled || string.IsNullOrEmpty(_flow.Text))
+-        {
+-            _flowDoc = null;
+-            _flowPaginator = null;
+-            _flowHost!.SetChild(null);
+-            return;
+-        }
+-
+-        var doc = new FlowDocument
+-        {
+-            PageWidth = _pageWidth,
+-            PageHeight = _pageHeight,
+-            PagePadding = new Thickness(_flow.MarginLeft, _flow.MarginTop, _flow.MarginRight, _flow.MarginBottom),
+-            ColumnWidth = double.PositiveInfinity, // 단일 컬럼.
+-            FontSize = _flow.FontSize > 0 ? _flow.FontSize : 20,
+-            TextAlignment = ParseFlowAlignment(_flow.Alignment),
+-            Foreground = new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color))
+-        };
+-        if (!string.IsNullOrEmpty(_flow.FontFamily))
+-        {
+-            try { doc.FontFamily = new FontFamily(_flow.FontFamily); } catch { /* 알 수 없는 글꼴은 기본 사용 */ }
+-        }
+-
+-        var defColor = string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color;
+-        var defOutline = string.IsNullOrEmpty(_flow.OutlineColor) ? "#00FFFFFF" : _flow.OutlineColor;
+-        _flowRenderMap = new System.Collections.Generic.Dictionary<Color, (Color, Color)>();
+-
+-        var runs = _flow.Runs.Count > 0 ? _flow.Runs : MakeDefaultRuns(_flow.Text);
+-
+-        // 불투명 아웃라인(기본값 또는 구간)이 하나라도 있으면 그룹 경로로 렌더한다.
+-        _flowNeedOutline = SafeColor(defOutline).A > 0;
+-        if (!_flowNeedOutline)
+-        {
+-            foreach (var run in runs)
+-            {
+-                if (!string.IsNullOrEmpty(run.OutlineColor) && SafeColor(run.OutlineColor).A > 0)
+-                {
+-                    _flowNeedOutline = true;
+-                    break;
+-                }
+-            }
+-        }
+-
+-        // (채움색,아웃라인색) 조합마다 고유 키색 부여(같은 채움색이라도 아웃라인이 다르면 다른 그룹).
+-        var pairKeys = new System.Collections.Generic.Dictionary<(Color, Color), Color>();
+-        var keySeq = 0;
+-
+-        // 구간(런)을 순서대로 문단으로 만든다. 런 텍스트 안의 줄바꿈마다 새 문단으로 나눈다.
+-        // 색/글꼴은 구간이 지정했을 때만 Run에 적용하고, 없으면 문서 기본값을 상속한다.
+-        var para = NewFlowParagraph();
+-        foreach (var run in runs)
+-        {
+-            var parts = run.Text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+-            for (var i = 0; i < parts.Length; i++)
+-            {
+-                if (i > 0)
+-                {
+-                    doc.Blocks.Add(para);
+-                    para = NewFlowParagraph();
+-                }
+-                if (parts[i].Length == 0)
+-                {
+-                    continue;
+-                }
+-
+-                var wpfRun = new Run(parts[i]);
+-                var fillColor = SafeColor(string.IsNullOrEmpty(run.Color) ? defColor : run.Color);
+-                var outlineColor = SafeColor(string.IsNullOrEmpty(run.OutlineColor) ? defOutline : run.OutlineColor);
+-                if (!string.IsNullOrEmpty(run.FontFamily))
+-                {
+-                    try { wpfRun.FontFamily = new FontFamily(run.FontFamily); } catch { /* 알 수 없는 글꼴은 기본 사용 */ }
+-                }
+-                if (_flowNeedOutline)
+-                {
+-                    // 그룹 경로: 모든 구간에 고유 키색을 전경색으로 부여(키색은 그리지 않음, 실제 색은 렌더 시 사용).
+-                    wpfRun.Foreground = new SolidColorBrush(FlowRenderKey(fillColor, outlineColor, pairKeys, ref keySeq));
+-                }
+-                else if (!string.IsNullOrEmpty(run.Color))
+-                {
+-                    wpfRun.Foreground = new SolidColorBrush(fillColor);
+-                }
+-                para.Inlines.Add(wpfRun);
+-            }
+-        }
+-        doc.Blocks.Add(para);
+-
+-        _flowDoc = doc;
+-        _flowPaginator = ((IDocumentPaginatorSource)doc).DocumentPaginator;
+-        _flowPaginator.PageSize = new Size(_pageWidth, _pageHeight);
+-        UpdateFlowTextLayer();
+-    }
+-
+-    private Paragraph NewFlowParagraph()
+-    {
+-        var p = new Paragraph { Margin = new Thickness(0) };
+-        if (_flow.LineHeight > 0)
+-        {
+-            p.LineHeight = _flow.LineHeight;
+-        }
+-        return p;
+-    }
+-
+-    // 현재 페이지 인덱스에 해당하는 분량만 표시한다. 인덱스가 분할된 페이지 수를 넘으면 빈 화면(잘림),
+-    // 페이지를 추가해 그 인덱스가 분량 안에 들어오면 다음 분량이 보인다.
+-    private void UpdateFlowTextLayer()
+-    {
+-        if (_flowHost == null)
+-        {
+-            return;
+-        }
+-
+-        if (_flowPaginator == null || _currentPageIndex < 0)
+-        {
+-            _flowHost.SetChild(null);
+-            return;
+-        }
+-
+-        try
+-        {
+-            if (!_flowPaginator.IsPageCountValid)
+-            {
+-                _flowPaginator.ComputePageCount(); // 전체 분할(최초/텍스트 변경 시 1회).
+-            }
+-
+-            if (_currentPageIndex >= _flowPaginator.PageCount)
+-            {
+-                _flowHost.SetChild(null); // 분량 부족 → 잘려서 안 보임.
+-                return;
+-            }
+-
+-            var page = _flowPaginator.GetPage(_currentPageIndex);
+-            _flowHost.SetChild(BuildFlowPageVisual(page.Visual));
+-        }
+-        catch
+-        {
+-            _flowHost.SetChild(null);
+-        }
+-    }
+-
+-    // 저장/복원에서 받은 데이터로 본문을 적용하고(인스펙터 갱신) 다시 분할한다.
++    // 저장/복원에서 받은 데이터로 모드 상태를 적용한다(숨은 체크박스·VN 섹션 표시 동기화).
+     private void ApplyFlowText(FlowTextData? data)
+     {
+         _flow = data?.Clone() ?? new FlowTextData();
+-        // 구버전 호환: 런이 없으면 Text 한 덩어리를 서식 없는 런 하나로 마이그레이션.
+-        if (_flow.Runs.Count == 0 && !string.IsNullOrEmpty(_flow.Text))
+-        {
+-            _flow.Runs = MakeDefaultRuns(_flow.Text);
+-        }
+-        LoadFlowInspector();
+-        ApplyBackdrop();
+-        RebuildFlowDocument();
+-    }
+-
+-    // 페이지 뒤(PageFrame)의 배경을 정한다. 텍스트 모드 ON이면 단일 뒷배경색, OFF면 페이지 색(기존 동작).
+-    // PageFrame.Background의 유일한 설정 지점(ApplyPageBackground도 여기로 위임).
+-    private void ApplyBackdrop()
+-    {
+-        if (PageFrame == null)
+-        {
+-            return;
+-        }
+-        var color = _flow.Enabled
+-            ? SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor)
+-            : CurrentPageBackgroundColor();
+-        PageFrame.Background = new SolidColorBrush(color);
+-    }
+-
+-    private static TextAlignment ParseFlowAlignment(string a) => a switch
+-    {
+-        "Center" => TextAlignment.Center,
+-        "Right" => TextAlignment.Right,
+-        "Justify" => TextAlignment.Justify,
+-        _ => TextAlignment.Left
+-    };
+-
+-    // --- 인스펙터 텍스트 섹션 ---
+-
+-    private void InitFlowFontCombo()
+-    {
+-        if (FlowFontFamilyComboBox == null)
+-        {
+-            return;
+-        }
+-
+-        var families = Fonts.SystemFontFamilies
+-            .Select(f => f.Source)
+-            .Where(s => !string.IsNullOrWhiteSpace(s))
+-            .Distinct()
+-            .OrderBy(s => s, System.StringComparer.CurrentCultureIgnoreCase);
+-
+-        FlowFontFamilyComboBox.Items.Clear();
+-        foreach (var name in families)
+-        {
+-            FlowFontFamilyComboBox.Items.Add(new ComboBoxItem
+-            {
+-                Content = new TextBlock { Text = name, FontFamily = new FontFamily(name) },
+-                Tag = name
+-            });
+-        }
+-
+-        SelectFlowFontInCombo(_flow.FontFamily); // 시작 시 기본 글꼴(말풍선과 동일) 선택.
+-    }
+-
+-    // _flow 값을 인스펙터 컨트롤에 채운다(불러오기·복원 시). 변경 이벤트는 _isLoadingInspector로 억제.
+-    private void LoadFlowInspector()
+-    {
+-        if (FlowTextBox == null)
+-        {
+-            return;
+-        }
+-
+         _isLoadingInspector = true;
+         FlowTextModeCheckBox.IsChecked = _flow.Enabled;
+-        FlowTextSectionBorder.Visibility = _flow.Enabled ? Visibility.Visible : Visibility.Collapsed;
+-        FlowTextBox.Text = _flow.Text;
+-        // 텍스트박스가 줄바꿈을 \r\n으로 정규화할 수 있으므로, 보이는 텍스트에 런·_flow.Text를 맞춘다.
+-        if (RunsText(_flow.Runs) != FlowTextBox.Text)
+-        {
+-            _flow.Runs = SpliceRuns(_flow.Runs, RunsText(_flow.Runs), FlowTextBox.Text);
+-            _flow.Text = FlowTextBox.Text;
+-        }
+-        FlowFontSizeBox.Text = $"{_flow.FontSize:0.##}";
+-        FlowLineHeightBox.Text = $"{_flow.LineHeight:0.##}";
+-        FlowMarginLeftBox.Text = $"{_flow.MarginLeft:0.##}";
+-        FlowMarginTopBox.Text = $"{_flow.MarginTop:0.##}";
+-        FlowMarginRightBox.Text = $"{_flow.MarginRight:0.##}";
+-        FlowMarginBottomBox.Text = $"{_flow.MarginBottom:0.##}";
+-        foreach (ComboBoxItem item in FlowAlignmentComboBox.Items)
+-        {
+-            item.IsSelected = item.Tag as string == _flow.Alignment;
+-        }
+-        SelectFlowFontInCombo(_flow.FontFamily);
+-        SelectBubbleColorInCombo(FlowColorComboBox,
+-            new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color)));
+-        SelectBubbleColorInCombo(FlowOutlineColorComboBox,
+-            new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.OutlineColor) ? TransparentHex : _flow.OutlineColor)));
+-        SelectBubbleColorInCombo(FlowBackdropColorComboBox,
+-            new SolidColorBrush(SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor)));
++        SetVnSectionVisible(_flow.Enabled);
+         _isLoadingInspector = false;
+     }
+ 
+-    private void SelectFlowFontInCombo(string family)
+-    {
+-        foreach (ComboBoxItem item in FlowFontFamilyComboBox.Items)
+-        {
+-            if (item.Tag is string tag && string.Equals(tag, family, System.StringComparison.OrdinalIgnoreCase))
+-            {
+-                FlowFontFamilyComboBox.SelectedItem = item;
+-                return;
+-            }
+-        }
+-        FlowFontFamilyComboBox.SelectedIndex = -1; // 기본 글꼴.
+-    }
+-
+-    // 텍스트 모드 ON/OFF 토글(Ctrl+T). 숨겨진 체크박스를 통해 섹션 표시·본문 오버레이를 함께 갱신.
++    // 비주얼 노벨 모드 ON/OFF 토글(Ctrl+T). 숨겨진 체크박스로 VN 섹션·페이지 목록 라벨을 함께 갱신.
+     private void ToggleTextMode()
+     {
+         if (FlowTextModeCheckBox == null)
+@@ -329,17 +25,12 @@ public partial class MainWindow : Window
+             return;
+         }
+         FlowTextModeCheckBox.IsChecked = !(FlowTextModeCheckBox.IsChecked == true);
+-        UpdateStatus(FlowTextModeCheckBox.IsChecked == true ? "텍스트 모드 ON" : "텍스트 모드 OFF");
++        UpdateStatus(FlowTextModeCheckBox.IsChecked == true ? "비주얼 노벨 모드 ON" : "비주얼 노벨 모드 OFF");
+     }
+ 
+     private void FlowTextModeCheckBox_Changed(object sender, RoutedEventArgs e)
+     {
+-        // 섹션 표시는 로딩 중에도 상태에 맞춰 갱신한다(체크박스가 토글되는 즉시 반영).
+-        if (FlowTextSectionBorder != null)
+-        {
+-            FlowTextSectionBorder.Visibility =
+-                FlowTextModeCheckBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+-        }
++        SetVnSectionVisible(FlowTextModeCheckBox.IsChecked == true);
+ 
+         if (!_flowReady || _isLoadingInspector)
+         {
+@@ -348,348 +39,44 @@ public partial class MainWindow : Window
+ 
+         _flow.Enabled = FlowTextModeCheckBox.IsChecked == true;
+         _historyDirty = true;
+-        ApplyBackdrop();       // ON/OFF에 따라 페이지 뒤 배경색을 켜거나 흰색으로 되돌린다.
+-        RebuildFlowDocument(); // ON/OFF에 따라 본문 오버레이를 켜거나 지운다.
+-    }
+-
+-    private void FlowTextBox_TextChanged(object sender, TextChangedEventArgs e)
+-    {
+-        if (!_flowReady || _isLoadingInspector)
++        if (_flow.Enabled)
+         {
+-            return;
+-        }
+-        // 편집(타이핑·삭제·붙여넣기)을 '한 구간 치환'으로 보고 런 스팬을 그 변경만큼만 갱신해 구간 서식을 보존한다.
+-        _flow.Runs = SpliceRuns(_flow.Runs, _flow.Text ?? string.Empty, FlowTextBox.Text);
+-        _flow.Text = FlowTextBox.Text;
+-        _historyDirty = true;
+-        RebuildFlowDocument();
+-    }
+-
+-    private void FlowStyleBox_Changed(object sender, TextChangedEventArgs e)
+-    {
+-        if (!_flowReady || _isLoadingInspector)
+-        {
+-            return;
+-        }
+-        _flow.FontSize = System.Math.Clamp(ParseDoubleOr(FlowFontSizeBox.Text, 20), 1, 500);
+-        _flow.LineHeight = System.Math.Max(0, ParseDoubleOr(FlowLineHeightBox.Text, 0));
+-        _flow.MarginLeft = System.Math.Max(0, ParseDoubleOr(FlowMarginLeftBox.Text, 0));
+-        _flow.MarginTop = System.Math.Max(0, ParseDoubleOr(FlowMarginTopBox.Text, 0));
+-        _flow.MarginRight = System.Math.Max(0, ParseDoubleOr(FlowMarginRightBox.Text, 0));
+-        _flow.MarginBottom = System.Math.Max(0, ParseDoubleOr(FlowMarginBottomBox.Text, 0));
+-        _historyDirty = true;
+-        RebuildFlowDocument();
+-    }
+-
+-    private void FlowAlignmentComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+-    {
+-        if (!_flowReady || _isLoadingInspector)
+-        {
+-            return;
+-        }
+-        _flow.Alignment = (FlowAlignmentComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Left";
+-        _historyDirty = true;
+-        RebuildFlowDocument();
+-    }
+-
+-    private void FlowFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+-    {
+-        if (!_flowReady || _isLoadingInspector)
+-        {
+-            return;
+-        }
+-        var family = (FlowFontFamilyComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? string.Empty;
+-        // 선택 구간이 있으면 그 구간만, 없으면 문서 기본 글꼴.
+-        ApplyFlowSelectionStyle(
+-            r => r.FontFamily = string.IsNullOrEmpty(family) ? null : family,
+-            () => _flow.FontFamily = family);
+-    }
+-
+-    private void FlowColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+-    {
+-        if (!_flowReady)
+-        {
+-            return;
+-        }
+-        OnColorComboChanged(FlowColorComboBox, true,
+-            () => SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color),
+-            c => ApplyFlowSelectionStyle(
+-                r => r.Color = ColorToHex(c),
+-                () => _flow.Color = ColorToHex(c)),
+-            Colors.Black);
+-    }
+-
+-    private void FlowOutlineColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+-    {
+-        if (!_flowReady)
+-        {
+-            return;
+-        }
+-        OnColorComboChanged(FlowOutlineColorComboBox, true,
+-            () => SafeColor(string.IsNullOrEmpty(_flow.OutlineColor) ? "#00FFFFFF" : _flow.OutlineColor),
+-            c => ApplyFlowSelectionStyle(
+-                r => r.OutlineColor = ColorToHex(c),
+-                () => _flow.OutlineColor = ColorToHex(c)),
+-            Colors.Transparent);
+-    }
+-
+-    // 선택 구간이 있으면 그 구간의 런에 set을 적용하고, 없으면 문서 기본값(setDefault)을 바꾼다. 이후 재분할.
+-    private void ApplyFlowSelectionStyle(System.Action<FlowTextRun> set, System.Action setDefault)
+-    {
+-        if (FlowTextBox != null && FlowTextBox.SelectionLength > 0)
+-        {
+-            EnsureRuns();
+-            var start = FlowTextBox.SelectionStart;
+-            var len = FlowTextBox.SelectionLength;
+-            _flow.Runs = ApplyStyleToRange(_flow.Runs, start, start + len, set);
+-            _flow.Text = RunsText(_flow.Runs);
+-            _historyDirty = true;
+-            RebuildFlowDocument();
+-            FlowTextBox.Focus();
+-            FlowTextBox.Select(start, len); // 선택을 유지해 연이어 다른 서식을 적용할 수 있게.
++            EnsureDefaultVnTemplate(); // 템플릿이 하나도 없으면 기본 템플릿을 만들어 둔다.
+         }
+         else
+         {
+-            setDefault();
+-            _historyDirty = true;
+-            RebuildFlowDocument();
+-        }
+-    }
+-
+-    private void FlowBackdropColorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+-    {
+-        if (!_flowReady)
+-        {
+-            return;
++            LeaveTemplateEditing(); // VN 모드를 끄면 템플릿 편집을 종료하고 일반 페이지로 복귀.
+         }
+-        OnColorComboChanged(FlowBackdropColorComboBox, true,
+-            () => SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor),
+-            c => { _flow.BackdropColor = ColorToHex(c); _historyDirty = true; ApplyBackdrop(); },
+-            Colors.White);
+-    }
+ 
+-    // 본문이 모두 보이도록 페이지 수를 분할 결과(PageCount)에 맞춘다. 부족하면 빈 페이지 추가, 남으면 뒤에서 삭제.
+-    private void FitPagesToFlowText_Click(object sender, RoutedEventArgs e)
+-    {
++        // 페이지 목록 라벨을 모드에 맞게 전환(현재 페이지 말풍선을 먼저 반영).
+         SaveCurrentPageState();
+-
+-        if (string.IsNullOrEmpty(_flow.Text) || _flowPaginator == null)
+-        {
+-            UpdateStatus("본문 텍스트가 없습니다.");
+-            return;
+-        }
+-
+-        int required;
+-        try
+-        {
+-            if (!_flowPaginator.IsPageCountValid)
+-            {
+-                _flowPaginator.ComputePageCount(); // 전체 분할(필요 페이지 수 산출).
+-            }
+-            required = System.Math.Max(1, _flowPaginator.PageCount);
+-        }
+-        catch
+-        {
+-            UpdateStatus("텍스트 분량을 계산할 수 없습니다.");
+-            return;
+-        }
+-
+-        if (required == _pages.Count)
+-        {
+-            UpdateStatus($"이미 텍스트 분량에 맞는 {required}개 페이지입니다.");
+-            return;
+-        }
+-
+-        if (required < _pages.Count)
+-        {
+-            // 줄이기: 뒤쪽 페이지를 삭제한다. 삭제 대상에 칸/내용이 있으면 한 번 확인한다(데이터 손실 방지).
+-            var removeCount = _pages.Count - required;
+-            var hasContent = false;
+-            for (var i = required; i < _pages.Count; i++)
+-            {
+-                if (_pages[i].Panels.Count > 0)
+-                {
+-                    hasContent = true;
+-                    break;
+-                }
+-            }
+-
+-            if (hasContent &&
+-                MessageBox.Show(this,
+-                    $"텍스트 분량에 맞추려면 뒤쪽 페이지 {removeCount}개를 삭제해야 합니다.\n그중 일부에는 칸/내용이 있습니다. 계속할까요?",
+-                    "텍스트 길이에 맞춰 페이지 생성", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+-            {
+-                return;
+-            }
+-
+-            _historyStructuralPending = true; // 페이지 구조 변경: 다음 캡처에서 전체 재직렬화.
+-            for (var i = _pages.Count - 1; i >= required; i--)
+-            {
+-                _pages.RemoveAt(i);
+-            }
+-        }
+-        else
++        foreach (var p in _pages)
+         {
+-            // 늘리기: 새 페이지는 현재 페이지의 크기·배경색·칸(수·모양·색)만 복제하고,
+-            // 칸 안의 내용(이미지·말풍선)은 비운다. JSON 왕복으로 깊은 복사해 페이지끼리 데이터를 공유하지 않게 한다.
+-            _historyStructuralPending = true;
+-            var templateJson = JsonSerializer.Serialize(_pages[_currentPageIndex]);
+-            while (_pages.Count < required)
+-            {
+-                var clone = JsonSerializer.Deserialize<ComicPageData>(templateJson)!;
+-                clone.Name = $"Page {_pages.Count + 1}";
+-                foreach (var panel in clone.Panels)
+-                {
+-                    panel.Images.Clear();  // 칸 모양만 복제 — 내용물(이미지)은 제외.
+-                    panel.Bubbles.Clear(); // 칸 모양만 복제 — 내용물(말풍선)은 제외.
+-                }
+-                _pages.Add(clone);
+-            }
++            p.VisualNovelMode = _flow.Enabled;
+         }
+-
+-        _currentPageIndex = System.Math.Clamp(_currentPageIndex, 0, _pages.Count - 1);
+-        LoadPage(_pages[_currentPageIndex]);
+-        ClearSelection();
+-        UpdatePageList();
+-        UpdateStatus($"텍스트 분량에 맞춰 페이지를 {required}개로 맞췄습니다.");
+     }
+ 
+-    // 분할된 페이지 Visual에 아웃라인을 입혀 다시 그린다. 글리프를 채움색별로 묶어 구간별 색·아웃라인을 보존한다.
+-    // 모든 아웃라인이 투명이면 네이티브 Visual을 그대로 쓴다(per-run 채움색은 이미 정확).
+-    private Visual BuildFlowPageVisual(Visual pageVisual)
++    // 비주얼 노벨 모드에서 현재 페이지 말풍선 변경 시 목록 요약을 즉시 갱신한다.
++    private void RefreshCurrentPageLabel()
+     {
+-        if (!_flowNeedOutline)
+-        {
+-            return pageVisual; // 불투명 아웃라인 없음 → 네이티브 글리프(구간별 채움색 그대로).
+-        }
+-
+-        var byColor = new System.Collections.Generic.Dictionary<Color, GeometryGroup>();
+-        CollectGlyphGeometry(pageVisual, pageVisual, byColor);
+-        if (byColor.Count == 0)
+-        {
+-            return pageVisual;
+-        }
+-
+-        var penWidth = System.Math.Max(3, (_flow.FontSize > 0 ? _flow.FontSize : 20) / 3.5);
+-        var defFill = SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color);
+-        var defOutline = SafeColor(string.IsNullOrEmpty(_flow.OutlineColor) ? "#00FFFFFF" : _flow.OutlineColor);
+-
+-        var dv = new DrawingVisual();
+-        using (var dc = dv.RenderOpen())
++        if (!_flow.Enabled || _currentPageIndex < 0 || _currentPageIndex >= _pages.Count)
+         {
+-            // 1패스: 외곽선(모든 글자 뒤로 깔리도록 먼저). 그룹 키색 → 실제 (채움,아웃라인) 매핑 사용.
+-            foreach (var kv in byColor)
+-            {
+-                var outline = _flowRenderMap.TryGetValue(kv.Key, out var pair) ? pair.Outline : defOutline;
+-                if (outline.A == 0)
+-                {
+-                    continue;
+-                }
+-                var pen = new Pen(new SolidColorBrush(outline), penWidth) { LineJoin = PenLineJoin.Round, MiterLimit = 2 };
+-                dc.DrawGeometry(null, pen, kv.Value);
+-            }
+-            // 2패스: 채움(각 구간의 실제 채움색).
+-            foreach (var kv in byColor)
+-            {
+-                var fill = _flowRenderMap.TryGetValue(kv.Key, out var pair) ? pair.Fill : defFill;
+-                dc.DrawGeometry(new SolidColorBrush(fill), null, kv.Value);
+-            }
+-        }
+-        return dv;
+-    }
+-
+-    // (채움,아웃라인) 조합마다 고유 키색을 반환한다(같은 조합은 재사용해 한 그룹으로 묶임). 키색은 그리지 않고 그룹 식별용.
+-    private Color FlowRenderKey(Color fill, Color outline, System.Collections.Generic.Dictionary<(Color, Color), Color> pairKeys, ref int seq)
+-    {
+-        var pk = (fill, outline);
+-        if (pairKeys.TryGetValue(pk, out var existing))
+-        {
+-            return existing;
+-        }
+-        var key = Color.FromArgb(255, (byte)(seq >> 16), (byte)(seq >> 8), (byte)seq);
+-        seq++;
+-        pairKeys[pk] = key;
+-        _flowRenderMap[key] = (fill, outline);
+-        return key;
+-    }
+-
+-    // 페이지 Visual 트리를 훑어 글리프 지오메트리를 '채움색별 그룹'으로 모은다(루트 좌표 기준).
+-    private void CollectGlyphGeometry(Visual root, Visual v, System.Collections.Generic.Dictionary<Color, GeometryGroup> acc)
+-    {
+-        var drawing = VisualTreeHelper.GetDrawing(v);
+-        if (drawing != null)
+-        {
+-            var m = ReferenceEquals(v, root) ? Matrix.Identity : AffineToAncestor(v, root);
+-            CollectGlyphFromDrawing(drawing, m, acc);
+-        }
+-
+-        var n = VisualTreeHelper.GetChildrenCount(v);
+-        for (var i = 0; i < n; i++)
+-        {
+-            if (VisualTreeHelper.GetChild(v, i) is Visual child)
+-            {
+-                CollectGlyphGeometry(root, child, acc);
+-            }
+-        }
+-    }
+-
+-    private void CollectGlyphFromDrawing(Drawing d, Matrix m, System.Collections.Generic.Dictionary<Color, GeometryGroup> acc)
+-    {
+-        switch (d)
+-        {
+-            case DrawingGroup dg:
+-                var gm = m;
+-                if (dg.Transform != null && !dg.Transform.Value.IsIdentity)
+-                {
+-                    gm = dg.Transform.Value * m;
+-                }
+-                foreach (var child in dg.Children)
+-                {
+-                    CollectGlyphFromDrawing(child, gm, acc);
+-                }
+-                break;
+-
+-            case GlyphRunDrawing grd when grd.GlyphRun != null:
+-                var geo = grd.GlyphRun.BuildGeometry();
+-                if (geo != null && !geo.IsEmpty())
+-                {
+-                    if (!m.IsIdentity)
+-                    {
+-                        geo.Transform = new MatrixTransform(m);
+-                    }
+-                    var color = (grd.ForegroundBrush as SolidColorBrush)?.Color
+-                                ?? SafeColor(string.IsNullOrEmpty(_flow.Color) ? "#000000" : _flow.Color);
+-                    if (!acc.TryGetValue(color, out var grp))
+-                    {
+-                        grp = new GeometryGroup { FillRule = FillRule.Nonzero };
+-                        acc[color] = grp;
+-                    }
+-                    grp.Children.Add(geo);
+-                }
+-                break;
++            return;
+         }
++        SaveCurrentPageState();
++        _pages[_currentPageIndex].RefreshDisplayLabel();
+     }
+ 
+-    // 비주얼의 로컬 좌표 → 조상 좌표로 가는 아핀 행렬을 복원한다(세 점 변환에서 역산).
+-    private static Matrix AffineToAncestor(Visual v, Visual ancestor)
++    // 가로 정렬 문자열 → TextAlignment(말풍선 텍스트 정렬·구간 직렬화 복원에서 사용).
++    private static TextAlignment ParseFlowAlignment(string a) => a switch
+     {
+-        var tx = v.TransformToAncestor(ancestor);
+-        var p0 = tx.Transform(new Point(0, 0));
+-        var px = tx.Transform(new Point(1, 0));
+-        var py = tx.Transform(new Point(0, 1));
+-        return new Matrix(px.X - p0.X, px.Y - p0.Y, py.X - p0.X, py.Y - p0.Y, p0.X, p0.Y);
+-    }
+-
+-    // --- 구간(런) 스팬 유틸 ---
++        "Center" => TextAlignment.Center,
++        "Right" => TextAlignment.Right,
++        "Justify" => TextAlignment.Justify,
++        _ => TextAlignment.Left
++    };
+ 
+-    // 런이 없으면 Text로부터 만든다(구간 서식 적용 직전 보장).
+-    private void EnsureRuns()
+-    {
+-        if (_flow.Runs.Count == 0 && !string.IsNullOrEmpty(_flow.Text))
+-        {
+-            _flow.Runs = MakeDefaultRuns(_flow.Text);
+-        }
+-    }
++    // --- 구간(런) 스팬 유틸 (말풍선 구간별 서식에서 재사용) ---
+ 
+     private static System.Collections.Generic.List<FlowTextRun> MakeDefaultRuns(string text)
+         => string.IsNullOrEmpty(text)
+@@ -697,7 +84,7 @@ public partial class MainWindow : Window
+             : new System.Collections.Generic.List<FlowTextRun> { new FlowTextRun { Text = text } };
+ 
+     private static string RunsText(System.Collections.Generic.List<FlowTextRun> runs)
+-        => string.Concat(runs.Select(r => r.Text));
++        => string.Concat(System.Linq.Enumerable.Select(runs, r => r.Text));
+ 
+     private static bool SameFlowStyle(FlowTextRun a, FlowTextRun b)
+         => (a.FontFamily ?? "") == (b.FontFamily ?? "")
+diff --git a/src/MainWindow/MainWindow.HitTest.cs b/src/MainWindow/MainWindow.HitTest.cs
+index 9df603b..d540e0b 100644
+--- a/src/MainWindow/MainWindow.HitTest.cs
++++ b/src/MainWindow/MainWindow.HitTest.cs
+@@ -353,8 +353,12 @@ public partial class MainWindow : Window
+         StatusText.Text = message;
+     }
+ 
++    // 불러오기 중에는 메뉴 IsChecked 세팅이 PageFitCheckBox_Changed를 통해 저장을 트리거하지 않도록 막는다.
++    private bool _loadingWindowSettings;
++
+     private void LoadWindowSettings()
+     {
++        _loadingWindowSettings = true;
+         try
+         {
+             // 새 이름이 있으면 그것을, 없으면 구버전 파일(window-settings.json)을 불러온다.
+@@ -416,6 +420,10 @@ public partial class MainWindow : Window
+         {
+             WindowStartupLocation = WindowStartupLocation.CenterScreen;
+         }
++        finally
++        {
++            _loadingWindowSettings = false;
++        }
+     }
+ 
+     // 저장된 창 영역이 (다중 모니터 포함) 화면 안에 충분히 보이는지 — 완전히 화면 밖이면 복원하지 않는다.
+diff --git a/src/MainWindow/MainWindow.Images.cs b/src/MainWindow/MainWindow.Images.cs
+index 859c2aa..ad89671 100644
+--- a/src/MainWindow/MainWindow.Images.cs
++++ b/src/MainWindow/MainWindow.Images.cs
+@@ -523,6 +523,39 @@ public partial class MainWindow : Window
+         image.Scale.ScaleY = scale;
+     }
+ 
++    // 이미지가 칸에 맞춰진(Uniform) 콘텐츠 대비 원본 100%가 되는 배율. 알 수 없으면 0.
++    private static double NativeScaleOf(PanelImage image)
++    {
++        var contentW = image.Content.Width;
++        var contentH = image.Content.Height;
++
++        double nativeW = 0, nativeH = 0;
++        if (image.Image?.Source is BitmapSource bitmap)
++        {
++            nativeW = bitmap.PixelWidth;
++            nativeH = bitmap.PixelHeight;
++        }
++        else if (image.Media != null && image.Media.NaturalVideoWidth > 0)
++        {
++            nativeW = image.Media.NaturalVideoWidth;
++            nativeH = image.Media.NaturalVideoHeight;
++        }
++
++        if (nativeW <= 0 || nativeH <= 0 || contentW <= 0 || contentH <= 0)
++        {
++            return 0;
++        }
++        var uniform = Math.Min(contentW / nativeW, contentH / nativeH);
++        return uniform > 0 ? 1.0 / uniform : 0;
++    }
++
++    // 휠 확대 상한: 원본 픽셀의 4배(= 4 × 원본100%배율). 원본이 작은 이미지는 기존 상한(5.0) 유지.
++    private static double MaxImageZoomScale(PanelImage image)
++    {
++        var native = NativeScaleOf(image);
++        return native > 0 ? Math.Max(5.0, 4.0 * native) : 5.0;
++    }
++
+     private static Image CreateImageControl(BitmapSource source, ComicPanel panel, Transform transform)
+     {
+         var image = new Image
+@@ -763,6 +796,7 @@ public partial class MainWindow : Window
+             ClearSelection(announce: false);
+         }
+ 
++        RefreshCurrentPageLabel(); // 비주얼 노벨 모드 페이지 목록 요약 갱신.
+         UpdateStatus("말풍선을 삭제했습니다.");
+         return true;
+     }
+@@ -825,6 +859,7 @@ public partial class MainWindow : Window
+         UpdateBubbleOrder(_selectedPanel);
+         UpdateBubbleList(_selectedPanel);
+         BubbleListBox.SelectedItem = _selectedBubble;
++        RefreshCurrentPageLabel(); // 비주얼 노벨 모드 페이지 목록 요약(말풍선 순서) 갱신.
+         UpdateStatus("말풍선 순서를 변경했습니다.");
+     }
+ 
+@@ -849,6 +884,7 @@ public partial class MainWindow : Window
+         UpdatePanelOrder();
+         UpdatePanelList();
+         PanelListBox.SelectedItem = _selectedPanel;
++        RefreshCurrentPageLabel(); // 칸 순서가 바뀌면 말풍선 요약 순서도 바뀌므로 페이지 목록 갱신.
+         UpdateStatus("칸 순서를 변경했습니다.");
+     }
+ 
+diff --git a/src/MainWindow/MainWindow.Inspector.cs b/src/MainWindow/MainWindow.Inspector.cs
+index d466758..09318eb 100644
+--- a/src/MainWindow/MainWindow.Inspector.cs
++++ b/src/MainWindow/MainWindow.Inspector.cs
+@@ -148,6 +148,16 @@ public partial class MainWindow : Window
+ 
+     private void ClearPanelImage_Click(object sender, RoutedEventArgs e)
+     {
++        // 파일이 없는(미해결) 이미지가 선택돼 있으면 그 보관 데이터를 제거한다(칸 선택 여부와 무관).
++        if (ImageListBox.SelectedItem is UnresolvedImageItem missing)
++        {
++            missing.Panel.UnresolvedImages.Remove(missing.Data);
++            _historyDirty = true;
++            UpdateImageList(missing.Panel);
++            UpdateStatus("없는 이미지 항목을 삭제했습니다.");
++            return;
++        }
++
+         if (_selectedPanel == null)
+         {
+             UpdateStatus("이미지를 제거할 칸을 먼저 선택하세요.");
+@@ -195,6 +205,7 @@ public partial class MainWindow : Window
+         UpdateBubbleList(_selectedPanel);
+         SelectBubble(bubble);
+         ScrollInspectorToSection();
++        RefreshCurrentPageLabel(); // 비주얼 노벨 모드 페이지 목록 요약 갱신.
+         UpdateStatus($"{_selectedPanel.Number}번 칸에 말풍선을 추가했습니다.");
+     }
+ 
+@@ -935,6 +946,7 @@ public partial class MainWindow : Window
+         _historyDirty = true;
+         // 텍스트가 길어지면 말풍선에 맞춰 글자 크기를 자동 축소한다.
+         ApplyBubbleAutoFit(_selectedBubble);
++        RefreshCurrentPageLabel(); // 비주얼 노벨 모드면 페이지 목록 요약 즉시 갱신.
+     }
+ 
+     // 선택 구간이 있으면 그 구간의 런에 set을 적용하고, 없으면 말풍선 전체 기본값(setBase)을 바꾼다.
+diff --git a/src/MainWindow/MainWindow.Interaction.cs b/src/MainWindow/MainWindow.Interaction.cs
+index 08cae04..f08fec5 100644
+--- a/src/MainWindow/MainWindow.Interaction.cs
++++ b/src/MainWindow/MainWindow.Interaction.cs
+@@ -517,6 +517,38 @@ public partial class MainWindow : Window
+         }
+     }
+ 
++    // 선택된 이미지가 칸 밖으로 벗어난 경우, 칸 프레임 밖(=BeginPanelDrag가 닿지 않는 곳)에서 이미지 위를
++    // 눌렀을 때 호출해 이미지 드래그를 시작한다. 소유 칸 프레임에 마우스를 캡처해 기존 이동/끝 핸들러를 재사용한다.
++    private void BeginOverflowImageDrag(MouseButtonEventArgs e)
++    {
++        var image = _selectedImage;
++        if (image == null)
++        {
++            return;
++        }
++        var frame = image.OwnerPanel.Frame;
++        _pendingSelect = null;
++        _pendingCycle = null;
++        _pendingDownPos = e.GetPosition(PageOverlay);
++        _isDraggingPanelImage = true;
++        _imageDragStart = e.GetPosition(frame); // 이동 계산은 소유 칸 프레임 좌표 기준(프레임 밖 음수 좌표도 정상).
++        _imageDragOrigin = new Point(image.Translate.X, image.Translate.Y);
++        frame.Cursor = Cursors.Hand;
++        frame.CaptureMouse(); // 캡처 후엔 프레임의 PreviewMouseMove/Up이 칸 밖에서도 모두 받아 드래그가 이어진다.
++    }
++
++    // 선택된 이미지가 (칸 밖으로 벗어난 부분 포함) 커서 아래에 있고, 소유 칸 프레임 밖을 눌렀는지.
++    // 프레임 안 클릭은 BeginPanelDrag가 정상 처리하므로 그 경우는 false(가로채지 않음).
++    private bool ShouldBeginOverflowImageDrag(MouseButtonEventArgs e)
++    {
++        if (!IsInspectorOpen() || _selectionKind != SelectionKind.Image || _selectedImage == null)
++        {
++            return false;
++        }
++        var frame = _selectedImage.OwnerPanel.Frame;
++        return !IsMouseOverElement(frame, e) && IsMouseOverElement(_selectedImage.Content, e);
++    }
++
+     // 클릭(이동 없음)으로 끝났으면 보류된 '한 단계 안쪽' 대상을 선택한다(드래그였으면 순환하지 않음).
+     private void CommitPendingCycleIfClick(MouseButtonEventArgs e)
+     {
+@@ -836,9 +868,11 @@ public partial class MainWindow : Window
+     private void ZoomImage(PanelImage image, MouseWheelEventArgs e)
+     {
+         var step = e.Delta > 0 ? 1.08 : 0.92;
++        // 상한은 원본 픽셀의 4배(큰 이미지는 원본 100%가 이미 높아 고정 5.0이면 더 못 키우므로).
++        var max = MaxImageZoomScale(image);
+         // 가로/세로 배율에 각각 같은 비율을 곱해(자유 리사이즈로 달라진 종횡비는 유지) 중심 고정 확대/축소.
+-        image.Scale.ScaleX = Math.Clamp(image.Scale.ScaleX * step, 0.3, 5.0);
+-        image.Scale.ScaleY = Math.Clamp(image.Scale.ScaleY * step, 0.3, 5.0);
++        image.Scale.ScaleX = Math.Clamp(image.Scale.ScaleX * step, 0.3, max);
++        image.Scale.ScaleY = Math.Clamp(image.Scale.ScaleY * step, 0.3, max);
+         PositionImageSelectionBox();
+         e.Handled = true;
+     }
+diff --git a/src/MainWindow/MainWindow.Pages.cs b/src/MainWindow/MainWindow.Pages.cs
+index d8b6ff3..7bddbf4 100644
+--- a/src/MainWindow/MainWindow.Pages.cs
++++ b/src/MainWindow/MainWindow.Pages.cs
+@@ -77,19 +77,24 @@ public partial class MainWindow : Window
+ 
+     private void SaveCurrentPageState()
+     {
+-        if (_pages.Count == 0 || _currentPageIndex < 0 || _currentPageIndex >= _pages.Count)
++        // 편집 대상: VN 템플릿을 편집 중이면 그 템플릿, 아니면 현재 일반 페이지.
++        var target = _editingTemplate;
++        if (target == null)
+         {
+-            return;
++            if (_pages.Count == 0 || _currentPageIndex < 0 || _currentPageIndex >= _pages.Count)
++            {
++                return;
++            }
++            target = _pages[_currentPageIndex];
+         }
+ 
+         // 같은 객체를 유지한 채 내용만 갱신한다. 객체를 교체하면 페이지 리스트(바인딩)가
+         // 옛 인스턴스를 보게 되어 인라인 이름 편집(IsEditing) 등이 동작하지 않는다.
+-        var page = _pages[_currentPageIndex];
+-        var captured = CaptureCurrentPage(page.Name);
+-        page.PageWidth = captured.PageWidth;
+-        page.PageHeight = captured.PageHeight;
+-        page.BackgroundColor = captured.BackgroundColor;
+-        page.Panels = captured.Panels;
++        var captured = CaptureCurrentPage(target.Name);
++        target.PageWidth = captured.PageWidth;
++        target.PageHeight = captured.PageHeight;
++        target.BackgroundColor = captured.BackgroundColor;
++        target.Panels = captured.Panels;
+     }
+ 
+     private ComicPageData CaptureCurrentPage(string name)
+@@ -120,6 +125,9 @@ public partial class MainWindow : Window
+         ScaleY = image.Scale.ScaleY,
+         TranslateX = image.Translate.X,
+         TranslateY = image.Translate.Y,
++        // Scale·Translate가 기준으로 삼는 콘텐츠 박스 크기(= 추가 당시 칸 크기). 함께 저장해야 재로딩 시 위치/크기가 보존된다.
++        BaseWidth = image.Content.Width,
++        BaseHeight = image.Content.Height,
+         IsCropped = image.IsCropped,
+         IsLocked = image.IsLocked,
+         PivotX = image.PivotX,
+@@ -221,6 +229,12 @@ public partial class MainWindow : Window
+             panelData.Images.Add(CaptureImageData(image));
+         }
+ 
++        // 파일이 없어 못 만든 이미지의 원본 데이터를 다시 포함시킨다(저장이 이를 덮어써 잃지 않도록).
++        foreach (var unresolved in panel.UnresolvedImages)
++        {
++            panelData.Images.Add(unresolved);
++        }
++
+         foreach (var bubble in panel.Bubbles)
+         {
+             panelData.Bubbles.Add(CaptureBubbleData(bubble));
+@@ -283,6 +297,8 @@ public partial class MainWindow : Window
+                     ScaleY = image.ScaleY,
+                     TranslateX = image.TranslateX,
+                     TranslateY = image.TranslateY,
++                    BaseWidth = image.BaseWidth,
++                    BaseHeight = image.BaseHeight,
+                     IsCropped = image.IsCropped,
+                     IsLocked = image.IsLocked,
+                     PivotX = image.PivotX,
+@@ -332,8 +348,13 @@ public partial class MainWindow : Window
+         Dispatcher.BeginInvoke(new Action(CullOffscreenPanels), System.Windows.Threading.DispatcherPriority.Loaded);
+         // 인접 페이지(다음·이전) 정지 이미지를 백그라운드로 미리 디코드해 캐시를 데운다(이전 예열은 취소).
+         BeginPrefetchAdjacentPages();
+-        // 본문 텍스트(노벨 뷰어): 이 페이지 인덱스에 해당하는 분량 표시.
+-        UpdateFlowTextLayer();
++
++        // 파일이 없어 못 띄운 이미지가 있으면 알린다(데이터는 보관되어 저장 시 유지됨 — 파일 복구 후 다시 열면 되살아남).
++        var missing = _panels.Sum(p => p.UnresolvedImages.Count);
++        if (missing > 0)
++        {
++            UpdateStatus($"이미지 파일 {missing}개를 찾지 못해 표시하지 못했습니다(데이터는 보존됨 — 파일을 복구한 뒤 다시 열면 복원됩니다).");
++        }
+     }
+ 
+     // --- DTO로부터 런타임 오브젝트 생성(불러오기·붙여넣기 공용) ---
+@@ -343,11 +364,19 @@ public partial class MainWindow : Window
+         var imagePath = ResolveProjectPath(imageData.Path);
+         if (!File.Exists(imagePath))
+         {
++            // 파일이 없어도 데이터를 버리지 않고 보관한다(저장 시 다시 합쳐 영구 삭제 방지).
++            panel.UnresolvedImages.Add(imageData);
+             return null;
+         }
+ 
+         var image = AddPanelImage(panel, imagePath);
+         if (!string.IsNullOrEmpty(imageData.Id)) image.Id = imageData.Id; // 저장/실행취소 ID 유지(붙여넣기는 비어 있어 새 ID 유지).
++        // 기준 콘텐츠 박스 크기 복원: Scale·Translate가 이 박스를 기준으로 계산되므로 추가 당시 크기로 되돌려야
++        // 위치/크기가 보존된다. 저장값이 없거나(구버전) 유효하지 않으면 현재 칸 크기(AddPanelImage 기본값)를 유지한다.
++        if (IsValidBaseSize(imageData.BaseWidth) && IsValidBaseSize(imageData.BaseHeight))
++        {
++            ApplyImageBaseSize(image, imageData.BaseWidth, imageData.BaseHeight);
++        }
+         image.Scale.ScaleX = imageData.Scale <= 0 ? 1 : imageData.Scale;
+         // ScaleY 미지정(구버전/비율 유지)이면 Scale과 동일(균일).
+         image.Scale.ScaleY = imageData.ScaleY <= 0
+@@ -370,6 +399,24 @@ public partial class MainWindow : Window
+         return image;
+     }
+ 
++    private static bool IsValidBaseSize(double v) => v > 0 && !double.IsNaN(v) && !double.IsInfinity(v);
++
++    // 이미지 리그(레이어 + 그 안의 콘텐츠·그라데이션·선택틴트·동영상 포스터)를 모두 같은 크기로 맞춘다.
++    // 모든 요소가 동일 크기 + 동일 변환 + 원점(0.5,0.5)을 공유해야 정렬이 맞으므로 함께 바꾼다.
++    private static void ApplyImageBaseSize(PanelImage image, double w, double h)
++    {
++        image.Layer.Width = w;
++        image.Layer.Height = h;
++        foreach (var child in image.Layer.Children)
++        {
++            if (child is FrameworkElement fe)
++            {
++                fe.Width = w;
++                fe.Height = h;
++            }
++        }
++    }
++
+     private SpeechBubble AddBubbleFromData(ComicPanel panel, SpeechBubbleData bubbleData)
+     {
+         var bubble = CreateSpeechBubble(
+@@ -517,9 +564,12 @@ public partial class MainWindow : Window
+             PageListBox.ItemsSource = _pages;
+         }
+ 
+-        foreach (var page in _pages)
++        for (var i = 0; i < _pages.Count; i++)
+         {
++            var page = _pages[i];
+             page.IsEditing = false; // 목록 갱신 시 인라인 편집 모드 해제(객체 bool만, 컨테이너 재생성 아님).
++            page.VisualNovelMode = _flow.Enabled; // 모드에 따라 목록 라벨(이름↔말풍선 요약) 전환.
++            page.DisplayIndex = i + 1; // 위치 기반 순번(가상화·스크롤과 무관하게 정확).
+         }
+ 
+         PageListBox.SelectedIndex = _currentPageIndex;
+@@ -531,6 +581,7 @@ public partial class MainWindow : Window
+     // Clear(Reset) 후 한 건씩 추가 — 전체 교체라 증분 이점은 없지만 드물게만 일어난다.
+     private void ReplacePages(IEnumerable<ComicPageData> pages)
+     {
++        _editingTemplate = null; // 페이지 전체 교체 시 템플릿 편집 모드 해제.
+         _pages.Clear();
+         foreach (var page in pages)
+         {
+diff --git a/src/MainWindow/MainWindow.Persistence.cs b/src/MainWindow/MainWindow.Persistence.cs
+index 9d271af..aa3fa22 100644
+--- a/src/MainWindow/MainWindow.Persistence.cs
++++ b/src/MainWindow/MainWindow.Persistence.cs
+@@ -22,7 +22,7 @@ public partial class MainWindow : Window
+     // 동영상 프레임 캡처로 디스패처를 펌프하는 동안엔 히스토리 타이머 등 콜백을 잠시 멈춘다(부분 상태 캡처 방지).
+     private bool _pumpingMedia;
+ 
+-    private enum ExportFormat { Png, Webp }
++    private enum ExportFormat { Png, Webp, Script }
+ 
+     // 마지막 내보내기 설정(세션·세션 간 기억). _exportWebp=null이면 형식은 페이지 움직임 유무로 자동 선택.
+     // (투명 배경은 별도 옵션 없이 '페이지 배경색'을 투명으로 두면 그대로 투명 출력된다.)
+@@ -107,13 +107,22 @@ public partial class MainWindow : Window
+ 
+         SaveCurrentPageState();
+ 
++        // 비주얼 노벨 모드의 '전체 페이지 내보내기'에서는 형식에 '스크립트(.txt)'를 추가로 제공한다.
++        var allowScript = !currentPageOnly && _flow.Enabled;
++
+         // 길이·FPS는 각 이미지의 '출력' 설정대로 자동 적용된다(설정 창에는 형식·배수·품질만).
+-        var settings = ShowExportDialog();
++        var settings = ShowExportDialog(allowScript);
+         if (settings == null)
+         {
+             return;
+         }
+ 
++        if (settings.Format == ExportFormat.Script)
++        {
++            ExportScriptTxt();
++            return;
++        }
++
+         var webp = settings.Format == ExportFormat.Webp;
+         var ext = webp ? "webp" : "png";
+         var originalIndex = _currentPageIndex;
+@@ -251,6 +260,51 @@ public partial class MainWindow : Window
+         }
+     }
+ 
++    // 모든 페이지의 말풍선 텍스트(페이지 목록에 보이는 요약)를 한 줄씩 .txt로 내보낸다.
++    private void ExportScriptTxt()
++    {
++        var save = new SaveFileDialog
++        {
++            Title = "스크립트 내보내기",
++            Filter = "텍스트 (*.txt)|*.txt",
++            FileName = $"{SanitizeFileName(string.IsNullOrWhiteSpace(ComicTitleTextBox.Text) ? "script" : ComicTitleTextBox.Text.Trim())}.txt"
++        };
++        if (save.ShowDialog(this) != true)
++        {
++            return;
++        }
++
++        try
++        {
++            // 페이지마다 말풍선 텍스트를 순서대로 ': '로 이어 한 줄로(페이지 목록 요약과 동일).
++            var lines = _pages.Select(PageScriptLine);
++            System.IO.File.WriteAllText(save.FileName, string.Join("\r\n", lines), new System.Text.UTF8Encoding(true));
++            UpdateStatus($"스크립트를 내보냈습니다: {save.FileName}");
++        }
++        catch (Exception ex)
++        {
++            MessageBox.Show(this, $"스크립트를 내보내지 못했습니다.\n\n{ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
++        }
++    }
++
++    // 한 페이지의 말풍선 텍스트를 순서대로(칸→말풍선) ': '로 이어 한 줄로 만든다(빈 말풍선 제외).
++    private static string PageScriptLine(ComicPageData page)
++    {
++        var texts = new List<string>();
++        foreach (var panel in page.Panels)
++        {
++            foreach (var bubble in panel.Bubbles)
++            {
++                var t = (bubble.Text ?? string.Empty).Replace("\r", " ").Replace("\n", " ").Trim();
++                if (t.Length > 0)
++                {
++                    texts.Add(t);
++                }
++            }
++        }
++        return string.Join(": ", texts);
++    }
++
+     // 현재 페이지를 PNG 한 장으로 저장(동영상은 첫 프레임 스틸을 임시 합성).
+     private void ExportPageToPng(string path, double scale)
+     {
+@@ -622,7 +676,7 @@ public partial class MainWindow : Window
+     // 통합 내보내기 설정 창. 형식(PNG/WebP)·배수, WebP면 무손실·품질을 받아 ExportSettings로 돌려준다.
+     // 취소하면 null. 길이·FPS는 각 이미지의 '출력' 설정대로 자동 적용되므로 여기엔 없다.
+     // 현재 페이지에 움직이는 요소가 있으면 WebP를 기본 선택한다.
+-    private ExportSettings? ShowExportDialog()
++    private ExportSettings? ShowExportDialog(bool allowScript)
+     {
+         ExportSettings? result = null;
+ 
+@@ -652,8 +706,16 @@ public partial class MainWindow : Window
+         root.Children.Add(pngRadio);
+         root.Children.Add(webpRadio);
+ 
++        // 비주얼 노벨 모드 전체 내보내기: 스크립트(.txt) 형식 추가.
++        var scriptRadio = new RadioButton { Content = "스크립트 (.txt — 모든 페이지 텍스트)", GroupName = "fmt", Foreground = dark, Margin = new Thickness(0, 2, 0, 0) };
++        if (allowScript)
++        {
++            root.Children.Add(scriptRadio);
++        }
++
+         // 배수.
+-        root.Children.Add(new TextBlock { Text = "배수", FontWeight = FontWeights.Bold, Foreground = dark, Margin = new Thickness(0, 12, 0, 6) });
++        var scaleHeader = new TextBlock { Text = "배수", FontWeight = FontWeights.Bold, Foreground = dark, Margin = new Thickness(0, 12, 0, 6) };
++        root.Children.Add(scaleHeader);
+         var scaleLabel = new TextBlock { Foreground = dark, FontWeight = FontWeights.Bold, MinWidth = 52, TextAlignment = System.Windows.TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+         var scaleSlider = new Slider { Minimum = 1, Maximum = 4, Value = Math.Clamp(_exportScale, 1, 4), TickFrequency = 0.25, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+         var scaleRow = new DockPanel();
+@@ -684,13 +746,17 @@ public partial class MainWindow : Window
+         void Refresh()
+         {
+             scaleLabel.Text = $"{scaleSlider.Value:0.##}×";
+-            animPanel.Visibility = webpRadio.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
++            var script = scriptRadio.IsChecked == true;
++            // 스크립트는 텍스트만 내보내므로 배수·무손실/품질을 숨긴다.
++            scaleHeader.Visibility = scaleRow.Visibility = script ? Visibility.Collapsed : Visibility.Visible;
++            animPanel.Visibility = (!script && webpRadio.IsChecked == true) ? Visibility.Visible : Visibility.Collapsed;
+             qualityLabel.Opacity = losslessCheck.IsChecked == true ? 0.4 : 1.0;
+             qualityBox.IsEnabled = losslessCheck.IsChecked != true;
+         }
+ 
+         pngRadio.Checked += (_, _) => Refresh();
+         webpRadio.Checked += (_, _) => Refresh();
++        scriptRadio.Checked += (_, _) => Refresh();
+         scaleSlider.ValueChanged += (_, _) => Refresh();
+         losslessCheck.Checked += (_, _) => Refresh();
+         losslessCheck.Unchecked += (_, _) => Refresh();
+@@ -701,6 +767,13 @@ public partial class MainWindow : Window
+         var okBtn = new Button { Content = "내보내기", MinWidth = 72, Margin = new Thickness(0, 0, 8, 0) };
+         okBtn.Click += (_, _) =>
+         {
++            if (scriptRadio.IsChecked == true)
++            {
++                result = new ExportSettings { Format = ExportFormat.Script };
++                dialog.DialogResult = true;
++                return;
++            }
++
+             var webpSel = webpRadio.IsChecked == true;
+             result = new ExportSettings
+             {
+@@ -749,17 +822,6 @@ public partial class MainWindow : Window
+         var visual = new DrawingVisual();
+         using (var context = visual.RenderOpen())
+         {
+-            // 텍스트 모드의 '뒷배경색'을 페이지보다 먼저(맨 뒤) 깐다. 페이지 배경이 불투명하면 그 위가 덮여 안 보이고,
+-            // 페이지 배경이 투명이면 이 색이 그대로 보인다('없음'(알파 0)이면 투명 유지).
+-            if (_flow.Enabled)
+-            {
+-                var backdrop = SafeColor(string.IsNullOrEmpty(_flow.BackdropColor) ? "#FFFFFF" : _flow.BackdropColor);
+-                if (backdrop.A > 0)
+-                {
+-                    context.DrawRectangle(new SolidColorBrush(backdrop), null, pageRect);
+-                }
+-            }
+-
+             // 배경을 직접 그린다(페이지별 색). PageSurface는 PageFrame 테두리(1px)만큼 오프셋이 있어
+             // VisualBrush로 쓰면 좌/상에 1px 투명 여백이 생기므로, 그리드 원점(0,0)에 있는 PanelCanvas를 렌더한다.
+             // 배경색이 투명(알파 0)이면 칠해도 아무 효과가 없어 그 영역이 투명으로 남는다(= 투명 내보내기).
+@@ -774,19 +836,6 @@ public partial class MainWindow : Window
+                 Stretch = Stretch.Fill
+             };
+             context.DrawRectangle(brush, null, pageRect);
+-
+-            // 본문 텍스트(노벨 뷰어) — 칸·이미지 위에 얹힌다. 현재 페이지 분량만큼만 보이므로 그대로 렌더한다.
+-            if (FlowTextLayer != null)
+-            {
+-                FlowTextLayer.UpdateLayout();
+-                var flowBrush = new VisualBrush(FlowTextLayer)
+-                {
+-                    ViewboxUnits = BrushMappingMode.Absolute,
+-                    Viewbox = pageRect,
+-                    Stretch = Stretch.Fill
+-                };
+-                context.DrawRectangle(flowBrush, null, pageRect);
+-            }
+         }
+ 
+         // 논리 페이지 좌표를 '실제 출력 버퍼 크기'로 확대 → 벡터·이미지가 더 높은 해상도로 재래스터화(슈퍼샘플링).
+@@ -1061,7 +1110,9 @@ public partial class MainWindow : Window
+             AutoGutter = ParseDoubleOr(AutoGutterTextBox.Text, 14),
+             CurrentPageIndex = _currentPageIndex,
+             Pages = CaptureProjectPages(Path.GetDirectoryName(fileName)),
+-            FlowText = _flow.Clone()
++            FlowText = _flow.Clone(),
++            VnTemplates = _vnTemplates.Select(t => CopyPageForStorage(t, Path.GetDirectoryName(fileName))).ToList(),
++            VnEditingIndex = _editingTemplate != null ? _vnTemplates.IndexOf(_editingTemplate) : -1
+         };
+ 
+         try
+@@ -1090,6 +1141,7 @@ public partial class MainWindow : Window
+         ComicTitleTextBox.Text = string.Empty;
+         _projectFilePath = null;
+         _projectBaseDirectory = null;
++        _vnTemplates.Clear();
+ 
+         // 선택한 칸 구성 / 여백 / 간격을 입력칸에도 반영(이후 '칸 구성 적용' 등과 일관).
+         LayoutPatternTextBox.Text = pattern;
+@@ -1329,6 +1381,11 @@ public partial class MainWindow : Window
+             AutoMarginTextBox.Text = $"{project.AutoMargin:0}";
+             AutoGutterTextBox.Text = $"{project.AutoGutter:0}";
+             ReplacePages(project.Pages);
++            _vnTemplates.Clear();
++            foreach (var t in project.VnTemplates)
++            {
++                _vnTemplates.Add(t);
++            }
+             _currentPageIndex = Math.Clamp(project.CurrentPageIndex, 0, _pages.Count - 1);
+             LoadPage(_pages[_currentPageIndex]);
+             ApplyFlowText(project.FlowText); // 본문 텍스트·서식 복원(인스펙터 갱신 + 재분할).
+diff --git a/src/MainWindow/MainWindow.Resize.cs b/src/MainWindow/MainWindow.Resize.cs
+index b3977f9..b914c4c 100644
+--- a/src/MainWindow/MainWindow.Resize.cs
++++ b/src/MainWindow/MainWindow.Resize.cs
+@@ -621,6 +621,15 @@ public partial class MainWindow : Window
+         var xs = new List<double> { origin.X, origin.X + frame.Width };
+         var ys = new List<double> { origin.Y, origin.Y + frame.Height };
+ 
++        // 크롭 OFF면 말풍선이 칸 밖으로 넘칠 수 있으므로 페이지의 끝(0·페이지 크기)에도 스냅한다.
++        if (!bubble.IsCropped)
++        {
++            xs.Add(0);
++            xs.Add(_pageWidth);
++            ys.Add(0);
++            ys.Add(_pageHeight);
++        }
++
+         var pageRect = new Rect(bLocal.X + origin.X, bLocal.Y + origin.Y, bLocal.Width, bLocal.Height);
+         var minW = BubbleWidthSlider.Minimum;
+         var minH = BubbleHeightSlider.Minimum;
+@@ -800,6 +809,15 @@ public partial class MainWindow : Window
+         var xs = new List<double> { origin.X, origin.X + pw };
+         var ys = new List<double> { origin.Y, origin.Y + ph };
+ 
++        // 크롭 OFF면 페이지 끝(0·페이지 크기)에도 스냅한다.
++        if (!bubble.IsCropped)
++        {
++            xs.Add(0);
++            xs.Add(_pageWidth);
++            ys.Add(0);
++            ys.Add(_pageHeight);
++        }
++
+         var px = x + origin.X;
+         var py = y + origin.Y;
+         double? gx = null, gy = null;
+diff --git a/src/MainWindow/MainWindow.Selection.cs b/src/MainWindow/MainWindow.Selection.cs
+index ef9bd03..5a8f0b8 100644
+--- a/src/MainWindow/MainWindow.Selection.cs
++++ b/src/MainWindow/MainWindow.Selection.cs
+@@ -632,6 +632,11 @@ public partial class MainWindow : Window
+             {
+                 ImageListBox.Items.Add(image);
+             }
++            // 파일이 없어 못 띄운 이미지도 목록에 보여 준다(존재 사실을 알 수 있게 — 데이터는 보존됨). 선택해 삭제 가능.
++            foreach (var missing in panel.UnresolvedImages)
++            {
++                ImageListBox.Items.Add(new UnresolvedImageItem(panel, missing));
++            }
+         }
+ 
+         ImageListBox.SelectedItem = _selectedImage != null && _selectedImage.OwnerPanel == panel
+diff --git a/src/MainWindow/MainWindow.Shortcuts.cs b/src/MainWindow/MainWindow.Shortcuts.cs
+index 20fd28a..c2bb633 100644
+--- a/src/MainWindow/MainWindow.Shortcuts.cs
++++ b/src/MainWindow/MainWindow.Shortcuts.cs
+@@ -23,7 +23,7 @@ public partial class MainWindow : Window
+         ("paste", "붙여넣기",       ModifierKeys.Control, Key.V),
+         ("reset", "선택 리셋",      ModifierKeys.Control, Key.R),
+         ("lock",  "선택 잠금/해제", ModifierKeys.None,    Key.L),
+-        ("toggletext", "텍스트 모드", ModifierKeys.Control, Key.T),
++        ("toggletext", "비주얼 노벨 모드 (테스트)", ModifierKeys.Control, Key.T),
+         ("preferences", "환경설정", ModifierKeys.Control, Key.OemComma),
+     };
+ 
+diff --git a/src/MainWindow/MainWindow.VisualNovel.cs b/src/MainWindow/MainWindow.VisualNovel.cs
+new file mode 100644
+index 0000000..f8e9324
+--- /dev/null
++++ b/src/MainWindow/MainWindow.VisualNovel.cs
+@@ -0,0 +1,299 @@
++using System.Collections.Generic;
++using System.Linq;
++using System.Text.Json;
++using System.Windows;
++using System.Windows.Controls;
++
++namespace KomaForge;
++
++public partial class MainWindow
++{
++    // 비주얼 노벨 섹션(스크립트→페이지 생성)의 표시 여부. VN 모드 ON일 때만 보인다.
++    private void SetVnSectionVisible(bool on)
++    {
++        if (VnSectionBorder != null)
++        {
++            VnSectionBorder.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
++        }
++    }
++
++    // 비주얼 노벨 모드에 템플릿이 하나도 없으면 기본 템플릿('이름'·'서술' 말풍선)을 1개 만들어 둔다.
++    // VN 모드를 켜는 시점에만 호출한다(실행취소/자동저장 복원 경로에서는 호출하지 않아 지운 템플릿이 되살아나지 않게).
++    private void EnsureDefaultVnTemplate()
++    {
++        if (_vnTemplates.Count > 0)
++        {
++            return;
++        }
++        var json = LoadDefaultVnTemplateJson();
++        if (json == null)
++        {
++            return;
++        }
++        try
++        {
++            var template = JsonSerializer.Deserialize<ComicPageData>(json);
++            if (template == null)
++            {
++                return;
++            }
++            RegeneratePageIds(template); // 새 ID 부여(임베디드 원본과 공유 없음).
++            template.Name = "템플릿 1";
++            _vnTemplates.Add(template);
++            _historyDirty = true;
++        }
++        catch
++        {
++            // 기본 템플릿 리소스가 손상됐어도 모드 진입은 막지 않는다(빈 목록 유지).
++        }
++    }
++
++    // 임베디드 리소스에서 기본 템플릿 JSON을 읽는다(없으면 null).
++    private static string? LoadDefaultVnTemplateJson()
++    {
++        var asm = typeof(MainWindow).Assembly;
++        var name = asm.GetManifestResourceNames()
++            .FirstOrDefault(n => n.EndsWith("DefaultVnTemplate.json", System.StringComparison.Ordinal));
++        if (name == null)
++        {
++            return null;
++        }
++        using var stream = asm.GetManifestResourceStream(name);
++        if (stream == null)
++        {
++            return null;
++        }
++        using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
++        return reader.ReadToEnd();
++    }
++
++    // 템플릿 복제: 템플릿을 편집(선택) 중이면 그 템플릿을, 아니면 현재 일반 페이지를 복제해 템플릿 목록에 추가한다.
++    private void VnAddTemplate_Click(object sender, RoutedEventArgs e)
++    {
++        var fromTemplate = _editingTemplate != null;
++        ComicPageData source;
++        if (_editingTemplate != null)
++        {
++            SaveCurrentPageState(); // 편집 내용을 선택 템플릿에 반영한 뒤 복제.
++            source = _editingTemplate;
++        }
++        else
++        {
++            if (_currentPageIndex < 0 || _currentPageIndex >= _pages.Count)
++            {
++                UpdateStatus("복제할 페이지가 없습니다.");
++                return;
++            }
++            SaveCurrentPageState();
++            source = _pages[_currentPageIndex];
++        }
++
++        // JSON 왕복으로 데이터를 깊은 복사하고(원본과 공유 없음), 내부 ID까지 새로 부여해 완전히 독립된 페이지로 만든다.
++        var clone = JsonSerializer.Deserialize<ComicPageData>(JsonSerializer.Serialize(source))!;
++        RegeneratePageIds(clone);
++        clone.Name = $"템플릿 {_vnTemplates.Count + 1}";
++        _vnTemplates.Add(clone);
++        VnTemplateListBox.SelectedItem = clone; // 선택 시 SelectionChanged가 복제본을 편집 대상으로 연다.
++        UpdateStatus(fromTemplate ? "선택한 템플릿을 복제했습니다." : "현재 페이지를 템플릿으로 복제했습니다.");
++    }
++
++    private void VnDeleteTemplate_Click(object sender, RoutedEventArgs e)
++    {
++        if (VnTemplateListBox.SelectedItem is ComicPageData t)
++        {
++            // 편집 중이던 템플릿을 삭제하면 일반 페이지 편집으로 복귀.
++            if (ReferenceEquals(_editingTemplate, t))
++            {
++                _editingTemplate = null;
++                if (_currentPageIndex >= 0 && _currentPageIndex < _pages.Count)
++                {
++                    LoadPage(_pages[_currentPageIndex]);
++                }
++            }
++            _vnTemplates.Remove(t);
++            UpdateStatus("템플릿을 삭제했습니다.");
++        }
++        else
++        {
++            UpdateStatus("삭제할 템플릿을 선택하세요.");
++        }
++    }
++
++    // 템플릿 목록에서 선택하면 그 템플릿을 캔버스로 열어 편집한다(수정은 SaveCurrentPageState로 템플릿에 저장됨).
++    private void VnTemplateListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
++    {
++        if (_isSwitchingEditTarget)
++        {
++            return;
++        }
++        if (VnTemplateListBox.SelectedItem is not ComicPageData t)
++        {
++            return;
++        }
++
++        SaveCurrentPageState(); // 직전 편집 대상(일반 페이지 또는 다른 템플릿) 저장.
++        _editingTemplate = t;
++        _isSwitchingEditTarget = true;
++        PageListBox.SelectedIndex = -1; // 일반 페이지 선택 해제(편집 대상이 템플릿임을 표시).
++        _isSwitchingEditTarget = false;
++        LoadPage(t);
++        ClearSelection();
++        UpdateStatus($"템플릿 '{t.Name}' 편집 중 — 캔버스 수정이 템플릿에 저장됩니다.");
++    }
++
++    // 템플릿 편집을 끝내고 일반 페이지 편집으로 복귀한다(템플릿에 최종 반영 후 캔버스를 현재 일반 페이지로).
++    private void LeaveTemplateEditing()
++    {
++        if (_editingTemplate == null)
++        {
++            return;
++        }
++        SaveCurrentPageState(); // 템플릿에 최종 반영.
++        _editingTemplate = null;
++        _isSwitchingEditTarget = true;
++        VnTemplateListBox.SelectedIndex = -1;
++        _isSwitchingEditTarget = false;
++        if (_currentPageIndex >= 0 && _currentPageIndex < _pages.Count)
++        {
++            LoadPage(_pages[_currentPageIndex]); // 캔버스를 일반 페이지로 복귀.
++        }
++    }
++
++    // 스크립트 각 줄마다 선택한 템플릿을 복제하고 '이름'/'서술' 말풍선을 교체해 일반 페이지를 만든다.
++    private void VnGenerate_Click(object sender, RoutedEventArgs e)
++    {
++        if (VnTemplateListBox.SelectedItem is not ComicPageData template)
++        {
++            MessageBox.Show(this, "비주얼 노벨 섹션의 템플릿 페이지를 먼저 선택하세요.",
++                "생성", MessageBoxButton.OK, MessageBoxImage.Information);
++            return;
++        }
++
++        var lines = (VnScriptBox.Text ?? string.Empty)
++            .Replace("\r\n", "\n").Replace('\r', '\n').Split('\n')
++            .Select(l => l.Trim())
++            .Where(l => l.Length > 0)
++            .ToList();
++        if (lines.Count == 0)
++        {
++            MessageBox.Show(this, "스크립트 텍스트를 입력하세요.",
++                "생성", MessageBoxButton.OK, MessageBoxImage.Information);
++            return;
++        }
++
++        // 템플릿에 '이름'·'서술' 말풍선이 모두 있어야 생성한다. 하나라도 없으면 규칙을 안내하고 중지.
++        var hasName = TemplateHasBubble(template, "이름");
++        var hasNarration = TemplateHasBubble(template, "서술");
++        if (!hasName || !hasNarration)
++        {
++            MessageBox.Show(this,
++                "선택한 템플릿 페이지에는 '이름' 말풍선과 '서술' 말풍선이 모두 있어야 합니다.\n" +
++                $"(현재: 이름 {(hasName ? "있음" : "없음")}, 서술 {(hasNarration ? "있음" : "없음")})\n\n" +
++                "규칙\n" +
++                "• 템플릿 페이지에 텍스트가 정확히 '이름'인 말풍선과 '서술'인 말풍선을 각각 만들어 두세요.\n" +
++                "• 스크립트 각 줄 '이름: 대사' → '이름' 말풍선=이름, '서술' 말풍선=대사.\n" +
++                "• 이름이 없는 줄(서술문)은 '이름' 말풍선을 삭제하고 '서술' 말풍선만 교체합니다.\n" +
++                "• 줄마다 템플릿을 복제해 페이지를 만듭니다.",
++                "생성 규칙", MessageBoxButton.OK, MessageBoxImage.Warning);
++            return;
++        }
++
++        SaveCurrentPageState();
++        _historyStructuralPending = true;
++
++        var templateJson = JsonSerializer.Serialize(template);
++        foreach (var line in lines)
++        {
++            SplitScriptLine(line, out var name, out var narration);
++            var page = JsonSerializer.Deserialize<ComicPageData>(templateJson)!;
++            RegeneratePageIds(page); // 생성된 페이지마다 고유 ID(템플릿·서로와 공유 없음).
++            page.Name = $"Page {_pages.Count + 1}";
++            ApplyScriptToPage(page, name, narration);
++            _pages.Add(page);
++        }
++
++        // 생성 후에는 일반 페이지(생성된 첫 페이지)를 편집하도록 템플릿 편집 모드를 해제한다.
++        _editingTemplate = null;
++        _isSwitchingEditTarget = true;
++        VnTemplateListBox.SelectedIndex = -1;
++        _isSwitchingEditTarget = false;
++        _currentPageIndex = _pages.Count - lines.Count;
++        LoadPage(_pages[_currentPageIndex]);
++        ClearSelection();
++        UpdatePageList();
++        UpdateStatus($"스크립트 {lines.Count}줄로 {lines.Count}개 페이지를 생성했습니다.");
++    }
++
++    // 복제 페이지의 칸·이미지·말풍선 ID를 모두 새로 부여한다(원본과 동일 식별자를 쓰지 않게 — 완전히 새 페이지).
++    private static void RegeneratePageIds(ComicPageData page)
++    {
++        foreach (var panel in page.Panels)
++        {
++            panel.Id = System.Guid.NewGuid().ToString("N");
++            foreach (var image in panel.Images)
++            {
++                image.Id = System.Guid.NewGuid().ToString("N");
++            }
++            foreach (var bubble in panel.Bubbles)
++            {
++                bubble.Id = System.Guid.NewGuid().ToString("N");
++            }
++        }
++    }
++
++    private static bool TemplateHasBubble(ComicPageData page, string marker)
++        => page.Panels.Any(p => p.Bubbles.Any(b => (b.Text ?? string.Empty).Trim() == marker));
++
++    // '이름: 대사' → name/narration. 콜론(':' 또는 '：')이 없으면 name=null, narration=전체 줄.
++    private static void SplitScriptLine(string line, out string? name, out string narration)
++    {
++        var idx = line.IndexOfAny(new[] { ':', '：' });
++        if (idx > 0)
++        {
++            name = line[..idx].Trim();
++            narration = line[(idx + 1)..].Trim();
++            if (name.Length == 0)
++            {
++                name = null;
++            }
++        }
++        else
++        {
++            name = null;
++            narration = line.Trim();
++        }
++    }
++
++    // 복제 페이지의 '이름'/'서술' 말풍선을 교체한다. 이름이 없는 줄이면 '이름' 말풍선은 삭제.
++    private static void ApplyScriptToPage(ComicPageData page, string? name, string narration)
++    {
++        foreach (var panel in page.Panels)
++        {
++            var kept = new List<SpeechBubbleData>();
++            foreach (var b in panel.Bubbles)
++            {
++                var marker = (b.Text ?? string.Empty).Trim();
++                if (marker == "이름")
++                {
++                    if (name == null)
++                    {
++                        continue; // 이름 없는 줄 → 이름 말풍선 삭제.
++                    }
++                    SetBubbleScriptText(b, name);
++                }
++                else if (marker == "서술")
++                {
++                    SetBubbleScriptText(b, narration);
++                }
++                kept.Add(b);
++            }
++            panel.Bubbles = kept;
++        }
++    }
++
++    private static void SetBubbleScriptText(SpeechBubbleData b, string text)
++    {
++        b.Text = text;
++        b.Runs = new List<FlowTextRun>(); // 구간 서식 초기화(불러올 때 단일 런으로 보임).
++    }
++}
+diff --git a/src/Models/Models.cs b/src/Models/Models.cs
+index 77e4391..4bdbc1f 100644
+--- a/src/Models/Models.cs
++++ b/src/Models/Models.cs
+@@ -75,6 +75,9 @@ public sealed class ComicPanel : System.ComponentModel.INotifyPropertyChanged
+     public Thumb ResizeHandle { get; }
+     public List<PanelImage> Images { get; } = new();
+     public PanelImage? SelectedImage { get; set; }
++    // 파일이 없어 런타임으로 만들지 못한 이미지의 원본 데이터(로드 시 보관). 저장 시 다시 합쳐 영구 삭제를 막는다.
++    // 파일이 복구되면 다음 로드에서 정상 이미지로 되살아난다.
++    public List<PanelImageData> UnresolvedImages { get; } = new();
+     public List<SpeechBubble> Bubbles { get; } = new();
+     public bool IsLocked { get; set; }
+ 
+@@ -193,6 +196,21 @@ public sealed class PanelImage
+     }
+ }
+ 
++// 파일이 없어 못 띄운 이미지를 이미지 리스트에 표시·삭제하기 위한 항목(원본 데이터·소유 칸을 함께 보관).
++public sealed class UnresolvedImageItem
++{
++    public ComicPanel Panel { get; }
++    public PanelImageData Data { get; }
++
++    public UnresolvedImageItem(ComicPanel panel, PanelImageData data)
++    {
++        Panel = panel;
++        Data = data;
++    }
++
++    public override string ToString() => $"⚠ (파일 없음) {System.IO.Path.GetFileName(Data.Path)}";
++}
++
+ public sealed class SpeechBubble
+ {
+     public SpeechBubble(
+diff --git a/src/Models/ProjectData.cs b/src/Models/ProjectData.cs
+index ac2ce54..c9da072 100644
+--- a/src/Models/ProjectData.cs
++++ b/src/Models/ProjectData.cs
+@@ -9,12 +9,16 @@ public sealed class ComicProjectData
+     public List<ComicPageData> Pages { get; set; } = new();
+     // 프로젝트 전체에 걸쳐 페이지별로 자동 분할(노벨 뷰어) 표시되는 본문 텍스트.
+     public FlowTextData FlowText { get; set; } = new();
++    // 비주얼 노벨 생성용 템플릿 페이지 목록(일반 페이지와 별개). 스크립트 각 줄을 이 템플릿에 복제·치환해 페이지를 만든다.
++    public List<ComicPageData> VnTemplates { get; set; } = new();
++    // 자동저장/실행취소 시 편집 중이던 템플릿 인덱스(-1이면 일반 페이지 편집). 복원 시 편집 대상을 되살린다.
++    public int VnEditingIndex { get; set; } = -1;
+ }
+ 
+ // 여러 페이지에 흘려 보여줄 본문 텍스트와 서식. 분할은 페이지 크기·이 서식으로 계산된다.
+ public sealed class FlowTextData
+ {
+-    // 텍스트 모드 ON/OFF. OFF면 본문을 페이지에 표시하지 않고 인스펙터 텍스트 섹션도 숨긴다.
++    // 비주얼 노벨 모드 ON/OFF. OFF면 본문을 페이지에 표시하지 않고 인스펙터 텍스트 섹션도 숨긴다.
+     public bool Enabled { get; set; }
+     public string Text { get; set; } = string.Empty;
+     public string FontFamily { get; set; } = "Malgun Gothic"; // 빈 값이면 기본 글꼴. 기본은 말풍선과 동일.
+@@ -60,7 +64,50 @@ public sealed class ComicPageData : System.ComponentModel.INotifyPropertyChanged
+     public string Name
+     {
+         get => _name;
+-        set { if (_name != value) { _name = value; OnChanged(nameof(Name)); } }
++        set { if (_name != value) { _name = value; OnChanged(nameof(Name)); OnChanged(nameof(DisplayLabel)); } }
++    }
++
++    // 목록에 표시할 1-based 순번. UpdatePageList에서 위치에 맞춰 갱신한다(AlternationIndex는 가상화/재활용 시
++    // 어긋나므로 쓰지 않는다). UI 전용, 저장 안 함.
++    private int _displayIndex;
++    [System.Text.Json.Serialization.JsonIgnore]
++    public int DisplayIndex
++    {
++        get => _displayIndex;
++        set { if (_displayIndex != value) { _displayIndex = value; OnChanged(nameof(DisplayIndex)); } }
++    }
++
++    // 비주얼 노벨 모드면 목록에 페이지 이름 대신 말풍선 텍스트 요약을 보여 준다(UI 전용, 저장 안 함).
++    private bool _visualNovelMode;
++    [System.Text.Json.Serialization.JsonIgnore]
++    public bool VisualNovelMode
++    {
++        get => _visualNovelMode;
++        set { if (_visualNovelMode != value) { _visualNovelMode = value; OnChanged(nameof(DisplayLabel)); } }
++    }
++
++    // 페이지 목록 표시 라벨. 비주얼 노벨 모드면 말풍선 텍스트(순서대로 ' / '), 아니면 페이지 이름.
++    [System.Text.Json.Serialization.JsonIgnore]
++    public string DisplayLabel => _visualNovelMode ? BubbleSummary() : Name;
++
++    // 비주얼 노벨 모드에서 현재 페이지 말풍선이 바뀌면 요약을 다시 계산하도록 알린다.
++    public void RefreshDisplayLabel() => OnChanged(nameof(DisplayLabel));
++
++    private string BubbleSummary()
++    {
++        var texts = new List<string>();
++        foreach (var panel in Panels)
++        {
++            foreach (var bubble in panel.Bubbles)
++            {
++                var t = (bubble.Text ?? string.Empty).Replace("\r", " ").Replace("\n", " ").Trim();
++                if (t.Length > 0)
++                {
++                    texts.Add(t);
++                }
++            }
++        }
++        return texts.Count > 0 ? string.Join(": ", texts) : string.Empty;
+     }
+ 
+     // 리스트에서 인라인 이름 편집 중인지(저장 안 함, UI 전용).
+@@ -116,6 +163,10 @@ public sealed class PanelImageData
+     public double ScaleY { get; set; }
+     public double TranslateX { get; set; }
+     public double TranslateY { get; set; }
++    // 기준 콘텐츠 박스 크기(= 이미지를 추가한 시점의 칸 폭/높이). Scale·Translate가 이 박스를 기준으로 계산되므로
++    // 반드시 함께 저장해야 한다. 0/미지정(구버전)이면 복원 시 현재 칸 크기로 폴백한다.
++    public double BaseWidth { get; set; }
++    public double BaseHeight { get; set; }
+     public bool IsCropped { get; set; } = true;
+     public bool IsLocked { get; set; }
+     public double PivotX { get; set; }
